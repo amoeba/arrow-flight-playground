@@ -5,6 +5,7 @@ import pyarrow.flight as flight
 import concurrent.futures
 import pandas as pd
 import numpy as np
+from multiprocessing import Pool
 
 PORT = 61234
 
@@ -42,11 +43,23 @@ if __name__ == "__main__":
     parser.add_argument("--timeout-ms", type=int, default=-1)
     args = parser.parse_args()
 
+    method = args.method
+    n_workers = args.n_workers
     n_clients = args.n_clients
     n_requests = args.n_reqs
     timeout_ms = args.timeout_ms
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # Determine method
+    if method == "process":
+        method_class = concurrent.futures.ProcessPoolExecutor
+    elif method == "thread":
+        method_class = concurrent.futures.ThreadPoolExecutor
+    else:
+        raise Exception(f"Method {method} not supported. Choose one of [process, thread]")
+
+    print(f"Running test using {method_class} with {n_workers} workers...")
+
+    with method_class(max_workers=n_workers) as executor:
         futures = [executor.submit(get_flight_info, n_requests, timeout_ms) for _ in range(n_clients)]
 
         # Collect stats
