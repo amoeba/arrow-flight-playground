@@ -1,3 +1,7 @@
 flight_datasets
 .vscode
 .envrc
+CMakeFiles
+*.ninja*
+CMakeCache.txt
+cmake_install.cmake
