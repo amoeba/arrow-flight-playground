@@ -1,0 +1,10 @@
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - pyarrow=9
+  - pandas
+  - numpy
+  - clang_osx-arm64=14
+  - cmake
+  - ninja

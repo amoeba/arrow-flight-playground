@@ -52,10 +52,13 @@ public:
                               const arrow::flight::FlightDescriptor &descriptor,
                               std::unique_ptr<arrow::flight::FlightInfo> *info) override
   {
+    std::cout << descriptor.ToString() << std::endl;
+
     ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(descriptor));
     ARROW_ASSIGN_OR_RAISE(auto flight_info, MakeFlightInfo(file_info));
     *info = std::unique_ptr<arrow::flight::FlightInfo>(
         new arrow::flight::FlightInfo(std::move(flight_info)));
+
     return arrow::Status::OK();
   }
 
@@ -179,7 +182,7 @@ arrow::Status serve() {
 
   arrow::flight::Location server_location;
   ARROW_ASSIGN_OR_RAISE(server_location,
-                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", 0));
+                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", 61234));
 
   arrow::flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<arrow::flight::FlightServerBase>(
