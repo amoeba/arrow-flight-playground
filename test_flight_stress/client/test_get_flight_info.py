@@ -56,9 +56,9 @@ if __name__ == "__main__":
         stats = {
             "n_clients": n_clients,
             "n_requests": n_requests,
-            "n_errors": len(errors),
-            "min": min(max_times),
-            "max": max(max_times)
+            "clients_in_error": len(errors),
+            "min_of_maxes": min(max_times),
+            "max_of_maxes": max(max_times)
         }
 
         print(stats)
