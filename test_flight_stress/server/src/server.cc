@@ -18,12 +18,12 @@
 #include <vector>
 #include <iostream>
 
-class ParquetStorageService : public arrow::flight::FlightServerBase
+class FlightStressTestServer : public arrow::flight::FlightServerBase
 {
 public:
   const arrow::flight::ActionType kActionDropDataset{"drop_dataset", "Delete a dataset."};
 
-  explicit ParquetStorageService(std::shared_ptr<arrow::fs::FileSystem> root)
+  explicit FlightStressTestServer(std::shared_ptr<arrow::fs::FileSystem> root)
       : root_(std::move(root)) {}
 
   arrow::Status ListFlights(
@@ -171,13 +171,12 @@ private:
   }
 
   std::shared_ptr<arrow::fs::FileSystem> root_;
-}; // end ParquetStorageService
+}; // end FlightStressTestServer
 
 
 arrow::Status serve() {
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   ARROW_RETURN_NOT_OK(fs->CreateDir("./flight_datasets/"));
-  ARROW_RETURN_NOT_OK(fs->DeleteDirContents("./flight_datasets/"));
   auto root = std::make_shared<arrow::fs::SubTreeFileSystem>("./flight_datasets/", fs);
 
   arrow::flight::Location server_location;
@@ -186,7 +185,7 @@ arrow::Status serve() {
 
   arrow::flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<arrow::flight::FlightServerBase>(
-      new ParquetStorageService(std::move(root)));
+      new FlightStressTestServer(std::move(root)));
   ARROW_RETURN_NOT_OK(server->Init(options));
   std::cout << "Listening on port " << server->port() << std::endl;
   ARROW_RETURN_NOT_OK(server->Serve());

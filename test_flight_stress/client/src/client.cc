@@ -21,6 +21,11 @@ Status RunMain(int argc, char** argv) {
     ARROW_ASSIGN_OR_RAISE(client, arrow::flight::FlightClient::Connect(location));
     std::cout << "Connected to " << location.ToString() << std::endl;
 
+    auto descriptor = arrow::flight::FlightDescriptor::Path({"test.parquet"});
+
+    std::unique_ptr<arrow::flight::FlightInfo> flight_info;
+    ARROW_ASSIGN_OR_RAISE(flight_info, client->GetFlightInfo(descriptor));
+
     return Status::OK();
 }
 

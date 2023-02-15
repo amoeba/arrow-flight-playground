@@ -10,16 +10,17 @@ endif()
 find_package(Arrow REQUIRED)
 if(NOT ${ARROW_VERSION} VERSION_GREATER "8.0.0")
   get_filename_component(ARROW_CMAKE_BASE_DIR ${Arrow_CONFIG} DIRECTORY)
+  message("${ARROW_CMAKE_BASE_DIR}")
   list(INSERT CMAKE_MODULE_PATH 0 ${ARROW_CMAKE_BASE_DIR})
 endif()
 find_package(ArrowFlight REQUIRED)
 find_package(Parquet REQUIRED)
 
 add_executable(
-    server
-    server.cc
+    client
+    client.cc
 )
 
-target_link_libraries(server parquet_shared arrow_flight_shared)
+target_link_libraries(client parquet_shared arrow_flight_shared)
 target_link_libraries(parquet_shared INTERFACE arrow_shared)
 target_link_libraries(arrow_flight_shared INTERFACE arrow_shared)
