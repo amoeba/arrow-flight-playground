@@ -35,9 +35,9 @@ def get_flight_info(n_requests: int, timeout_ms: int) -> float:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
-                    prog = 'ProgramName',
-                    description = 'What the program does',
-                    epilog = 'Text at the bottom of help')
+                    prog = 'test_get_flight_info.py')
+    parser.add_argument("--method", type=str, default="process")
+    parser.add_argument("--n-workers", type=int, default=10)
     parser.add_argument("--n-clients", type=int, default=10)
     parser.add_argument("--n-reqs", type=int, default=10)
     parser.add_argument("--timeout-ms", type=int, default=-1)
