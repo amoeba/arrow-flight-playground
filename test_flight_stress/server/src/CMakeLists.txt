@@ -14,12 +14,13 @@ if(NOT ${ARROW_VERSION} VERSION_GREATER "9.0.0")
 endif()
 find_package(ArrowFlight REQUIRED)
 find_package(Parquet REQUIRED)
+find_package(gRPC)
 
 add_executable(
     server
     server.cc
 )
 
-target_link_libraries(server parquet_shared arrow_flight_shared)
+target_link_libraries(server parquet_shared arrow_flight_shared gRPC::grpcpp_channelz)
 target_link_libraries(parquet_shared INTERFACE arrow_shared)
 target_link_libraries(arrow_flight_shared INTERFACE arrow_shared)
