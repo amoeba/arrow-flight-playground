@@ -12,6 +12,8 @@
 #include <parquet/arrow/reader.h>
 #include <parquet/arrow/writer.h>
 
+#include <grpcpp/ext/channelz_service_plugin.h>
+
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -186,6 +188,10 @@ arrow::Status serve() {
   arrow::flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<arrow::flight::FlightServerBase>(
       new FlightStressTestServer(std::move(root)));
+
+  // Must call this before server->Init();
+  grpc::channelz::experimental::InitChannelzService();
+
   ARROW_RETURN_NOT_OK(server->Init(options));
   std::cout << "Listening on port " << server->port() << std::endl;
   ARROW_RETURN_NOT_OK(server->Serve());
