@@ -10,6 +10,8 @@ find_package(Parquet REQUIRED)
 
 ###
 
+set(CMAKE_BUILD_TYPE Debug)
+
 add_executable(client client.cc)
 set_property(TARGET client PROPERTY CXX_STANDARD 17)
 # NOTE: We use arrow_shared here for older Arrow (like v9). Use

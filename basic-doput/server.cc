@@ -22,6 +22,8 @@ public:
 		const arrow::flight::ServerCallContext &, const arrow::flight::Criteria *,
 		std::unique_ptr<arrow::flight::FlightListing> *listings) override
 	{
+		std::cout << "ListFlights" << std::endl;
+
 		arrow::fs::FileSelector selector;
 		selector.base_dir = "/";
 		ARROW_ASSIGN_OR_RAISE(auto listing, root_->GetFileInfo(selector));
@@ -37,6 +39,23 @@ public:
 
 		*listings = std::unique_ptr<arrow::flight::FlightListing>(
 			new arrow::flight::SimpleFlightListing(std::move(flights)));
+		return arrow::Status::OK();
+	}
+
+	arrow::Status DoPut(const arrow::flight::ServerCallContext &,
+						std::unique_ptr<arrow::flight::FlightMessageReader> reader,
+						std::unique_ptr<arrow::flight::FlightMetadataWriter>) override
+	{
+		std::cout << "DoPut" << std::endl;
+
+		ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(reader->descriptor()));
+		std::cout << file_info.path() << std::endl;
+
+		ARROW_ASSIGN_OR_RAISE(auto sink, root_->OpenOutputStream(file_info.path()));
+		ARROW_ASSIGN_OR_RAISE(std::shared_ptr<arrow::Table> table, reader->ToTable());
+
+		ARROW_RETURN_NOT_OK(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(),
+													   sink, /*chunk_size=*/65536));
 		return arrow::Status::OK();
 	}
 
@@ -68,6 +87,20 @@ private:
 											   total_bytes);
 	}
 
+	arrow::Result<arrow::fs::FileInfo> FileInfoFromDescriptor(
+		const arrow::flight::FlightDescriptor &descriptor)
+	{
+		if (descriptor.type != arrow::flight::FlightDescriptor::PATH)
+		{
+			return arrow::Status::Invalid("Must provide PATH-type FlightDescriptor");
+		}
+		else if (descriptor.path.size() != 1)
+		{
+			return arrow::Status::Invalid(
+				"Must provide PATH-type FlightDescriptor with one path component");
+		}
+		return root_->GetFileInfo(descriptor.path[0]);
+	}
 	std::shared_ptr<arrow::fs::FileSystem> root_;
 };
 
