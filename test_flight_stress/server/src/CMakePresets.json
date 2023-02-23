@@ -9,7 +9,8 @@
         {
             "name": "base",
             "hidden": true,
-            "generator": "Ninja",
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
             "cacheVariables": {}
         },
         {

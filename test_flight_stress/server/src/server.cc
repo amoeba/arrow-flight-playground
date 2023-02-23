@@ -12,7 +12,7 @@
 #include <parquet/arrow/reader.h>
 #include <parquet/arrow/writer.h>
 
-#include <grpcpp/ext/channelz_service_plugin.h>
+// #include <grpcpp/ext/channelz_service_plugin.h>
 
 #include <algorithm>
 #include <memory>
@@ -190,7 +190,7 @@ arrow::Status serve() {
       new FlightStressTestServer(std::move(root)));
 
   // Must call this before server->Init();
-  grpc::channelz::experimental::InitChannelzService();
+  // grpc::channelz::experimental::InitChannelzService();
 
   ARROW_RETURN_NOT_OK(server->Init(options));
   std::cout << "Listening on port " << server->port() << std::endl;
