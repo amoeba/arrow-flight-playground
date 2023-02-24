@@ -176,14 +176,14 @@ private:
 }; // end FlightStressTestServer
 
 
-arrow::Status serve() {
+arrow::Status serve(int32_t port) {
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   ARROW_RETURN_NOT_OK(fs->CreateDir("./flight_datasets/"));
   auto root = std::make_shared<arrow::fs::SubTreeFileSystem>("./flight_datasets/", fs);
 
   arrow::flight::Location server_location;
   ARROW_ASSIGN_OR_RAISE(server_location,
-                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", 61234));
+                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", port));
 
   arrow::flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<arrow::flight::FlightServerBase>(
@@ -200,8 +200,9 @@ arrow::Status serve() {
 
 int main(int argc, char **argv)
 {
-  // TODO: accept args
-  arrow::Status st = serve();
+  int32_t port = argc > 1 ? std::atoi(argv[1]) : 5000;
+
+  arrow::Status st = serve(port);
   if (!st.ok())
   {
     return 1;

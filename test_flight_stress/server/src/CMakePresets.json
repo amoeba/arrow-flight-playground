@@ -11,7 +11,9 @@
             "hidden": true,
             "generator": "Unix Makefiles",
             "binaryDir": "${sourceDir}/build/${presetName}",
-            "cacheVariables": {}
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+            }
         },
         {
             "name": "debug",
