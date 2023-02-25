@@ -14,12 +14,69 @@
 
 using arrow::Status;
 
+std::string GetFlightMethodName(arrow::flight::FlightMethod method)
+{
+	if (method == arrow::flight::FlightMethod::Invalid)
+	{
+		return "Invalid";
+	}
+	else if (method == arrow::flight::FlightMethod::Handshake)
+	{
+		return "Handshake";
+	}
+	else if (method == arrow::flight::FlightMethod::ListFlights)
+	{
+		return "ListFlights";
+	}
+	else if (method == arrow::flight::FlightMethod::GetFlightInfo)
+	{
+		return "GetFlightInfo";
+	}
+	else if (method == arrow::flight::FlightMethod::GetSchema)
+	{
+		return "GetSchema";
+	}
+	else if (method == arrow::flight::FlightMethod::DoGet)
+	{
+		return "DoGet";
+	}
+	else if (method == arrow::flight::FlightMethod::DoPut)
+	{
+		return "DoPut";
+	}
+	else if (method == arrow::flight::FlightMethod::DoAction)
+	{
+		return "DoAction";
+	}
+	else if (method == arrow::flight::FlightMethod::ListActions)
+	{
+		return "ListActions";
+	}
+	else if (method == arrow::flight::FlightMethod::DoExchange)
+	{
+		return "DoExchange";
+	}
+	else
+	{
+		return "UNKNOWN";
+	}
+}
+
 class HeaderInjectingMiddlewareFactory : public arrow::flight::ClientMiddlewareFactory
 {
 public:
+	void SetID(int64_t id)
+	{
+		id_ = id;
+	}
+
 	void StartCall(const arrow::flight::CallInfo &info, std::unique_ptr<arrow::flight::ClientMiddleware> *middleware)
 	{
-		ARROW_UNUSED(info);
+		// Just futzing around
+		arrow::flight::FlightMethod method = info.method;
+		printf("🌝 Middleware / FlightMethod = %s\n", GetFlightMethodName(method).c_str());
+		printf("⚡️ Middleware / ID = %lld\n", id_);
+
 		*middleware = std::unique_ptr<arrow::flight::ClientMiddleware>(new HeaderInjectingMiddleware(*this));
 	}
 
@@ -32,7 +89,7 @@ private:
 
 		void SendingHeaders(arrow::flight::AddCallHeaders *outgoing_headers) override
 		{
-			outgoing_headers->AddHeader("x-testing", "somevalue");
+			outgoing_headers->AddHeader("x-client-id", "somevalue");
 		}
 
 		void ReceivedHeaders(const arrow::flight::CallHeaders &incoming_headers) override
@@ -44,12 +101,9 @@ private:
 	private:
 		HeaderInjectingMiddlewareFactory &factory_;
 	};
-};
 
-std::shared_ptr<arrow::flight::ClientMiddlewareFactory> GetCookieFactory()
-{
-	return std::make_shared<HeaderInjectingMiddlewareFactory>();
-}
+	int64_t id_;
+};
 
 class DoPutFlightClient
 {
@@ -60,13 +114,15 @@ public:
 
 	arrow::Status ConnectClient(arrow::flight::Location location)
 	{
+		int64_t client_id = 1234;
+		auto middleware = std::make_shared<HeaderInjectingMiddlewareFactory>();
+		middleware->SetID(client_id);
 
-		auto options = arrow::flight::FlightClientOptions::Defaults();
+		arrow::flight::FlightClientOptions options;
+		// auto options = arrow::flight::FlightClientOptions::Defaults();
+		options.middleware.push_back(middleware);
 
-		// TODO: The rest
-		// options.middleware.push_back(second_client_middleware_);
-
-		ARROW_ASSIGN_OR_RAISE(client, arrow::flight::FlightClient::Connect(location));
+		ARROW_ASSIGN_OR_RAISE(client, arrow::flight::FlightClient::Connect(location, options));
 		std::cout << "Connected to " << location.ToString() << std::endl;
 
 		fs = std::make_shared<arrow::fs::LocalFileSystem>();
@@ -79,10 +135,7 @@ public:
 	ListFlights()
 	{
 		std::unique_ptr<arrow::flight::FlightListing> listing;
-
-		arrow::flight::FlightCallOptions options;
-		options.headers.push_back(std::make_pair("x-my-header", "testing"));
-		ARROW_ASSIGN_OR_RAISE(listing, client->ListFlights(options, {}));
+		ARROW_ASSIGN_OR_RAISE(listing, client->ListFlights());
 
 		std::unique_ptr<arrow::flight::FlightInfo> flight_info;
 		ARROW_ASSIGN_OR_RAISE(flight_info, listing->Next());
