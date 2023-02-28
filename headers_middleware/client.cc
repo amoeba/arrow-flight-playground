@@ -65,19 +65,11 @@ std::string GetFlightMethodName(arrow::flight::FlightMethod method)
 class HeaderInjectingMiddlewareFactory : public arrow::flight::ClientMiddlewareFactory
 {
 public:
-	void SetID(int64_t id)
+	void StartCall(const arrow::flight::CallInfo &info,
+				   std::unique_ptr<arrow::flight::ClientMiddleware> *middleware)
 	{
-		id_ = id;
-	}
-
-	void StartCall(const arrow::flight::CallInfo &info, std::unique_ptr<arrow::flight::ClientMiddleware> *middleware)
-	{
-		// Just futzing around
-		arrow::flight::FlightMethod method = info.method;
-		printf("🌝 Middleware / FlightMethod = %s\n", GetFlightMethodName(method).c_str());
-		printf("⚡️ Middleware / ID = %lld\n", id_);
-
-		*middleware = std::unique_ptr<arrow::flight::ClientMiddleware>(new HeaderInjectingMiddleware(*this));
+		*middleware = std::unique_ptr<arrow::flight::ClientMiddleware>(
+			new HeaderInjectingMiddleware(*this));
 	}
 
 private:
@@ -89,20 +81,17 @@ private:
 
 		void SendingHeaders(arrow::flight::AddCallHeaders *outgoing_headers) override
 		{
-			outgoing_headers->AddHeader("x-client-id", "somevalue");
+			outgoing_headers->AddHeader("x-tracing-span-id", "somevalue");
 		}
 
-		void ReceivedHeaders(const arrow::flight::CallHeaders &incoming_headers) override
-		{
-		}
+		void ReceivedHeaders(const arrow::flight::CallHeaders
+								 &incoming_headers) override {}
 
 		void CallCompleted(const Status &status) override {}
 
 	private:
 		HeaderInjectingMiddlewareFactory &factory_;
 	};
-
-	int64_t id_;
 };
 
 class DoPutFlightClient
@@ -114,40 +103,43 @@ public:
 
 	arrow::Status ConnectClient(arrow::flight::Location location)
 	{
-		int64_t client_id = 1234;
-		auto middleware = std::make_shared<HeaderInjectingMiddlewareFactory>();
-		middleware->SetID(client_id);
+		auto middleware =
+			std::make_shared<HeaderInjectingMiddlewareFactory>();
 
 		arrow::flight::FlightClientOptions options;
-		// auto options = arrow::flight::FlightClientOptions::Defaults();
+		// auto options =
+		// arrow::flight::FlightClientOptions::Defaults();
 		options.middleware.push_back(middleware);
 
-		ARROW_ASSIGN_OR_RAISE(client, arrow::flight::FlightClient::Connect(location, options));
-		std::cout << "Connected to " << location.ToString() << std::endl;
+		ARROW_ASSIGN_OR_RAISE(
+			client,
+			arrow::flight::FlightClient::Connect(location, options));
+		std::cout << "Connected to " << location.ToString()
+				  << std::endl;
 
 		fs = std::make_shared<arrow::fs::LocalFileSystem>();
-		root = std::make_shared<arrow::fs::SubTreeFileSystem>("./data/", fs);
+		root = std::make_shared<arrow::fs::SubTreeFileSystem>("./data/",
+															  fs);
 
 		return arrow::Status::OK();
 	}
 
-	arrow::Status
-	ListFlights()
+	arrow::Status ListFlights()
 	{
-		std::unique_ptr<arrow::flight::FlightListing> listing;
-		ARROW_ASSIGN_OR_RAISE(listing, client->ListFlights());
+				std::unique_ptr<arrow::flight::FlightListing> listing;
+				ARROW_ASSIGN_OR_RAISE(listing, client->ListFlights());
 
-		std::unique_ptr<arrow::flight::FlightInfo> flight_info;
-		ARROW_ASSIGN_OR_RAISE(flight_info, listing->Next());
+				std::unique_ptr<arrow::flight::FlightInfo> flight_info;
+				ARROW_ASSIGN_OR_RAISE(flight_info, listing->Next());
 
-		if (!flight_info)
-		{
-			return arrow::Status::OK();
-		}
+				if (!flight_info)
+				{
+				  return arrow::Status::OK();
+				}
 
-		std::cout << flight_info->descriptor().ToString() << std::endl;
+				std::cout << flight_info->descriptor().ToString() << std::endl;
 
-		return arrow::Status::OK();
+				return arrow::Status::OK();
 	}
 
 private:
