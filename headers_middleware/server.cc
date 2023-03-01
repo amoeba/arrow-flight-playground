@@ -5,20 +5,12 @@
 
 #include <arrow/api.h>
 #include <arrow/filesystem/api.h>
-// #include <arrow/flight/api.h>
 #include <arrow/flight/middleware.h>
 #include <arrow/flight/server_middleware.h>
-// #include <arrow/pretty_print.h>
 #include <arrow/result.h>
-// #include <arrow/status.h>
-
 #include <arrow/flight/api.h>
-// #include <arrow/flight/client_tracing_middleware.h>
-// #include <arrow/flight/server_tracing_middleware.h>
 #include <arrow/ipc/test_common.h>
 #include <arrow/status.h>
-// #include <arrow/testing/generator.h>
-// #include <arrow/testing/gtest_util.h>
 #include <arrow/testing/util.h>
 #include <arrow/util/base64.h>
 #include <arrow/util/logging.h>
@@ -28,8 +20,6 @@
 #include <parquet/arrow/writer.h>
 
 using arrow::Status;
-
-using CallHeaders = std::multimap<arrow::util::string_view, arrow::util::string_view>;
 
 class TracingTestServerMiddleware : public arrow::flight::ServerMiddleware
 {
