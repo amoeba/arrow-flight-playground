@@ -1,5 +1,0 @@
-# basic-doput
-
-## Running
-
-TODO
