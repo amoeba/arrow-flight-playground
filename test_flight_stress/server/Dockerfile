@@ -1,7 +1,8 @@
 FROM ubuntu:22.04
 
-# Name of one of the presets in CMakePresets.json.
+# CMake build type
 ARG build_type=Release
+# Dependency versions
 ARG absl_version=20230125.1
 ARG protobuf_version=3.20.0
 ARG grpc_version=1.35.0
