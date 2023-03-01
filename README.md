@@ -4,7 +4,10 @@ Various examples related to [Apache Arrow Flight](https://arrow.apache.org/docs/
 
 ## Included Examples
 
-- [DoPut](./basic-doput/): Basic example of the `DoPut` call
+- [basic-doput](./basic-doput/): Basic example of the `DoPut` call
+- [headers_call_options](./headers_call_options/): Example of using FlightCallOptions to pass context between a Flight Server and Flight Client
+- [headers_middleware](./headers_middleware/): Example of using Flight Middleware to pass context between a Flight Server and Flight Client
+- [test_flight_stress](./test_flight_stress/): Example of various combinations of Arrow versions and Flight Clients to stress test Flight
 
 
 ## Building & Running
