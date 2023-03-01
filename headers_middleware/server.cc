@@ -25,7 +25,10 @@ class TracingTestServerMiddleware : public arrow::flight::ServerMiddleware
 {
 public:
   explicit TracingTestServerMiddleware(const std::string &current_span_id)
-      : span_id(current_span_id) {}
+      : span_id(current_span_id)
+  {
+    std::cout << "Request received span id of `" << current_span_id << "`" << std::endl;
+  }
   void
   SendingHeaders(arrow::flight::AddCallHeaders *outgoing_headers) override {}
   void CallCompleted(const Status &status) override {}
@@ -51,7 +54,8 @@ public:
         incoming_headers.equal_range("x-tracing-span-id");
     if (iter_pair.first != iter_pair.second)
     {
-      const std::string_view &value = (*iter_pair.first).second;
+
+      const arrow::util::string_view &value = (*iter_pair.first).second;
       *middleware =
           std::make_shared<TracingTestServerMiddleware>(std::string(value));
     }
@@ -151,16 +155,19 @@ Status Serve(int argc, char **argv)
   auto root =
       std::make_shared<arrow::fs::SubTreeFileSystem>(serve_directory, fs);
 
-  arrow::flight::Location server_location;
-  ARROW_ASSIGN_OR_RAISE(server_location,
-                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", 61234));
-
   // Make middleware
   std::shared_ptr<TracingTestServerMiddlewareFactory> server_middleware;
   server_middleware = std::make_shared<TracingTestServerMiddlewareFactory>();
 
+  // Make options
+  arrow::flight::Location server_location;
+  ARROW_ASSIGN_OR_RAISE(server_location,
+                        arrow::flight::Location::ForGrpcTcp("0.0.0.0", 61234));
+
   arrow::flight::FlightServerOptions options(server_location);
   options.middleware.push_back({"tracing", server_middleware});
+
+  // Start server
   auto server = std::unique_ptr<arrow::flight::FlightServerBase>(
       new BasicDoPutFlightServer(std::move(root)));
 

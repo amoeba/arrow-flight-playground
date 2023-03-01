@@ -81,7 +81,7 @@ private:
 
 		void SendingHeaders(arrow::flight::AddCallHeaders *outgoing_headers) override
 		{
-			outgoing_headers->AddHeader("x-tracing-span-id", "somevalue");
+			outgoing_headers->AddHeader("x-tracing-span-id", "my-span-id");
 		}
 
 		void ReceivedHeaders(const arrow::flight::CallHeaders
