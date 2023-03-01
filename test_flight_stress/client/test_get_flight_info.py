@@ -1,13 +1,9 @@
 import argparse
 import time
-from typing import Union
 import pyarrow.flight as flight
 import concurrent.futures
-import pandas as pd
-import numpy as np
-from multiprocessing import Pool
 
-PORT = 61234
+PORT = 5001
 
 def get_flight_client():
     location = f"grpc+tcp://localhost:{PORT}"
@@ -24,31 +20,17 @@ def get_flight_info(n_requests: int, timeout_ms: int) -> float:
         try:
             client.get_flight_info(descriptor, options)
         except Exception as e:
-            return None # None signals exception
+            if "Path does not exist" in str(e):
+                pass
+            else:
+                print(e)
+                return None # None signals exception
         end_time = time.time()
         max_time = max((max_time, end_time - start_time))
     return max_time
 
 
-
-# Report status
-
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(
-                    prog = 'test_get_flight_info.py')
-    parser.add_argument("--method", type=str, default="process")
-    parser.add_argument("--n-workers", type=int, default=10)
-    parser.add_argument("--n-clients", type=int, default=10)
-    parser.add_argument("--n-reqs", type=int, default=10)
-    parser.add_argument("--timeout-ms", type=int, default=-1)
-    args = parser.parse_args()
-
-    method = args.method
-    n_workers = args.n_workers
-    n_clients = args.n_clients
-    n_requests = args.n_reqs
-    timeout_ms = args.timeout_ms
-
+def test_get_flight_info(method, n_workers, n_clients, n_requests, timeout_ms=-1):
     # Determine method
     if method == "process":
         method_class = concurrent.futures.ProcessPoolExecutor
@@ -66,6 +48,9 @@ if __name__ == "__main__":
         values = [future.result() for future in concurrent.futures.as_completed(futures)]
         max_times = [v for v in values if v is not None]
         errors = [v for v in values if v is None]
+        if len(max_times) == 0:
+            print(errors)
+            quit()
         stats = {
             "n_clients": n_clients,
             "n_requests": n_requests,
@@ -74,5 +59,25 @@ if __name__ == "__main__":
             "max_of_maxes": max(max_times)
         }
 
-        print(stats)
+        return stats
 
+# Report status
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+                    prog = 'test_get_flight_info.py')
+    parser.add_argument("--method", type=str, default="process")
+    parser.add_argument("--n-workers", type=int, default=10)
+    parser.add_argument("--n-clients", type=int, default=10)
+    parser.add_argument("--n-reqs", type=int, default=10)
+    parser.add_argument("--timeout-ms", type=int, default=-1)
+    args = parser.parse_args()
+
+    stats = test_get_flight_info(
+        args.method,
+        args.n_workers,
+        args.n_clients,
+        args.n_reqs,
+        args.timeout_ms,
+    )
+    print(stats)
