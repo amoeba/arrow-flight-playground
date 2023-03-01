@@ -9,8 +9,11 @@
         {
             "name": "base",
             "hidden": true,
-            "generator": "Ninja",
-            "cacheVariables": {}
+            "generator": "Unix Makefiles",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_CXX_COMPILER_LAUNCHER": "ccache"
+            }
         },
         {
             "name": "debug",
