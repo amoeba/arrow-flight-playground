@@ -229,15 +229,23 @@ private:
 }; // end FlightStressTestServer
 
 void ConfigureTraceExport() {
+  // Create this server as a resource
+  // See also: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service
+  auto resource = opentelemetry::sdk::resource::Resource::Create({
+    {"service.name", "server"},
+    {"service.namespace", "FlightParquet"},
+    {"service.instance.id", "localhost"},
+    {"service.version", "1.0.0"},
+  });
+
   // Use gRPC OTLP export for Jaeger
   otlp::OtlpGrpcExporterOptions opts;
-  opts.service_name = "parquet_flight_server";
   opts.endpoint = "http://jaegar:4317";
   auto otlp_exporter = otlp::OtlpGrpcExporterFactory::Create(opts);
   auto otlp_processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(otlp_exporter));
   
   std::shared_ptr<trace_sdk::TracerProvider> provider =
-    std::make_shared<trace_sdk::TracerProvider>(std::move(otlp_processor));
+    std::make_shared<trace_sdk::TracerProvider>(std::move(otlp_processor), resource);
 
   // For debugging, uncomment the OStream exporter to get traces send to stdout.
   // auto os_exporter = trace_exporter::OStreamSpanExporterFactory::Create();
