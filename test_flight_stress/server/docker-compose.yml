@@ -4,6 +4,9 @@ services:
     build: .
     ports:
       - "5001:5000" # Flight endpoint
+    # environment:
+    #   - GRPC_TRACE=http
+    #   - GRPC_VERBOSITY=INFO
   jaegar:
     image: jaegertracing/all-in-one:latest
     environment:

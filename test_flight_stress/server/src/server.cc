@@ -58,10 +58,23 @@ public:
     tracer_ = provider->GetTracer("example_flight_server", "0.0.1");
   }
 
+  void PrintTraceContext(const flight::ServerCallContext &context)
+  {
+    auto *middleware =
+        reinterpret_cast<flight::TracingServerMiddleware *>(context.GetMiddleware("tracing"));
+    std::cout << "Trace context: " << std::endl;
+    for (auto pair : middleware->GetTraceContext())
+    {
+      std::cout << "  " << pair.key << ": " << pair.value << std::endl;
+    }
+  }
+
   Status ListFlights(
-      const flight::ServerCallContext &, const flight::Criteria *,
+      const flight::ServerCallContext &context, const flight::Criteria *,
       std::unique_ptr<flight::FlightListing> *listings) override
   {
+    PrintTraceContext(context);
+
     arrow::fs::FileSelector selector;
     selector.base_dir = "/";
     ARROW_ASSIGN_OR_RAISE(auto listing, root_->GetFileInfo(selector));
@@ -80,10 +93,12 @@ public:
     return Status::OK();
   }
 
-  Status GetFlightInfo(const flight::ServerCallContext &,
+  Status GetFlightInfo(const flight::ServerCallContext &context,
                        const flight::FlightDescriptor &descriptor,
                        std::unique_ptr<flight::FlightInfo> *info) override
   {
+    PrintTraceContext(context);
+
     std::cout << descriptor.ToString() << std::endl;
 
     ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(descriptor));
@@ -94,10 +109,11 @@ public:
     return Status::OK();
   }
 
-  Status DoPut(const flight::ServerCallContext &,
+  Status DoPut(const flight::ServerCallContext &context,
                std::unique_ptr<flight::FlightMessageReader> reader,
                std::unique_ptr<flight::FlightMetadataWriter>) override
   {
+    PrintTraceContext(context);
     ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(reader->descriptor()));
     ARROW_ASSIGN_OR_RAISE(auto sink, root_->OpenOutputStream(file_info.path()));
 
@@ -122,10 +138,12 @@ public:
     return Status::OK();
   }
 
-  Status DoGet(const flight::ServerCallContext &,
+  Status DoGet(const flight::ServerCallContext &context,
                const flight::Ticket &request,
                std::unique_ptr<flight::FlightDataStream> *stream) override
   {
+    PrintTraceContext(context);
+
     ARROW_ASSIGN_OR_RAISE(auto input, root_->OpenInputFile(request.ticket));
     std::unique_ptr<parquet::arrow::FileReader> reader;
     ARROW_RETURN_NOT_OK(parquet::arrow::OpenFile(std::move(input),
@@ -228,14 +246,15 @@ private:
   nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
 }; // end FlightStressTestServer
 
-void ConfigureTraceExport() {
+void ConfigureTraceExport()
+{
   // Create this server as a resource
   // See also: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service
   auto resource = opentelemetry::sdk::resource::Resource::Create({
-    {"service.name", "server"},
-    {"service.namespace", "FlightParquet"},
-    {"service.instance.id", "localhost"},
-    {"service.version", "1.0.0"},
+      {"service.name", "server"},
+      {"service.namespace", "FlightParquet"},
+      {"service.instance.id", "localhost"},
+      {"service.version", "1.0.0"},
   });
 
   // Use gRPC OTLP export for Jaeger
@@ -243,9 +262,9 @@ void ConfigureTraceExport() {
   opts.endpoint = "http://jaegar:4317";
   auto otlp_exporter = otlp::OtlpGrpcExporterFactory::Create(opts);
   auto otlp_processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(otlp_exporter));
-  
+
   std::shared_ptr<trace_sdk::TracerProvider> provider =
-    std::make_shared<trace_sdk::TracerProvider>(std::move(otlp_processor), resource);
+      std::make_shared<trace_sdk::TracerProvider>(std::move(otlp_processor), resource);
 
   // For debugging, uncomment the OStream exporter to get traces send to stdout.
   // auto os_exporter = trace_exporter::OStreamSpanExporterFactory::Create();
