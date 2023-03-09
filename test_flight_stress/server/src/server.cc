@@ -22,6 +22,9 @@
 #include "opentelemetry/sdk/trace/simple_processor_factory.h"
 #include "opentelemetry/sdk/common/global_log_handler.h"
 #include "opentelemetry/sdk/trace/tracer_provider.h"
+#include <opentelemetry/context/propagation/global_propagator.h>
+#include <opentelemetry/context/propagation/text_map_propagator.h>
+#include <opentelemetry/trace/propagation/http_trace_context.h>
 
 // #include <grpcpp/ext/channelz_service_plugin.h>
 
@@ -39,8 +42,10 @@ namespace otlp = opentelemetry::exporter::otlp;
 namespace trace = opentelemetry::trace;
 namespace trace_sdk = opentelemetry::sdk::trace;
 namespace trace_exporter = opentelemetry::exporter::trace;
+namespace propagation = opentelemetry::context;
+namespace context = opentelemetry::context;
 
-namespace internal_log = opentelemetry::sdk::common::internal_log;
+
 
 using Status = arrow::Status;
 
@@ -273,6 +278,11 @@ void ConfigureTraceExport()
 
   // Set the global trace provider
   trace::Provider::SetTracerProvider(std::dynamic_pointer_cast<trace::TracerProvider>(provider));
+
+  // You must add this, or else the traces will not be propagated from the client.
+  context::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
+      opentelemetry::nostd::shared_ptr<context::propagation::TextMapPropagator>(
+          new opentelemetry::trace::propagation::HttpTraceContext()));
 }
 
 // TODO: how to sample?

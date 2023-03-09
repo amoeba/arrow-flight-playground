@@ -1,24 +1,32 @@
-from opentelemetry import trace, propagate
+from opentelemetry import trace
 import pyarrow.flight as flight
-
-tracer = trace.get_tracer(__name__)
-
-PROPAGATOR = propagate.get_global_textmap()
+from opentelemetry.propagate import inject
+from opentelemetry.trace import set_span_in_context
 
 
 class ClientTracingMiddlewareFactory(flight.ClientMiddlewareFactory):
+    def __init__(self):
+        super().__init__()
+        self._tracer = trace.get_tracer(
+            __name__
+        )
+
     def start_call(self, info):
-        return ClientTracingMiddleware()
+        span = self._tracer.start_span(str(info.method))
+        return ClientTracingMiddleware(span)
+
 
 class ClientTracingMiddleware(flight.ClientMiddleware):
-    def sending_headers(self) -> dict:
-        new_headers = {}
-        # propagators.inject(type(new_headers).__setitem__, new_headers)
-        
-        PROPAGATOR.inject(new_headers)
-        new_headers = { k.encode("utf-8"): v.encode("utf-8") for k, v in new_headers.items()}
-        
-        if b"tracestate" not in new_headers:
-            new_headers[b"tracestate"] = b""
-        print(new_headers)
-        return new_headers
+    def __init__(self, span):
+        self._span = span
+
+    def sending_headers(self):
+        ctx = set_span_in_context(self._span)
+        carrier = {}
+        inject(carrier=carrier, context=ctx)
+        return carrier
+
+    def call_completed(self, exception):
+        if exception:
+            self._span.record_exception(exception)
+        self._span.end()
