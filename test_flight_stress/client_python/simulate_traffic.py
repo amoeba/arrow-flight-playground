@@ -49,10 +49,13 @@ def simulate_client():
 
 
 if __name__ == "__main__":
-    n_clients = 3
-    executor = concurrent.futures.ProcessPoolExecutor(max_workers=n_clients)
+    while True:
+        n_clients = 3
+        executor = concurrent.futures.ProcessPoolExecutor(max_workers=n_clients)
 
-    futures = [executor.submit(simulate_client) for _ in range(n_clients)]
+        futures = [executor.submit(simulate_client) for _ in range(n_clients)]
 
-    for future in concurrent.futures.as_completed(futures):
-        future.result()
+        for future in concurrent.futures.as_completed(futures):
+            future.result()
+
+        time.sleep(5)
