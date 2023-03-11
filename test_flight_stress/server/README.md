@@ -21,7 +21,7 @@ docker build . \
 
 
 ```sh
-docker run \
+docker run -it \
     --publish 5001:5000 \
     example-flight-server
 ```
