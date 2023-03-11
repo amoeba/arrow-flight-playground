@@ -1,0 +1,23 @@
+version: "3.9"
+services:
+  flight-client:
+    build: ./client_python
+    environment:
+      - FLIGHT_SERVER_URI=grpc+tcp://flight-server:5000
+      - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
+  flight-server:
+    build: ./server
+    volumes:
+      - ./flight_datasets:/flight_datasets
+    ports:
+      - "5000:5000"
+    environment:
+      - FLIGHT_DATASET_DIR=/flight_datasets
+      - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4317:4317"
