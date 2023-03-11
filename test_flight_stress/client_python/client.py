@@ -38,7 +38,8 @@ class StorageServiceClient:
             descriptor = flight.FlightDescriptor.for_path(path)
             info = self.conn.get_flight_info(descriptor)
 
-            tab = self.conn.do_get(info).to_table()
+            # Get from first endpoint
+            tab = self.conn.do_get(info.endpoints[0].ticket).read_all()
             current_span.set_attribute("num_rows", tab.num_rows)
 
             return tab
