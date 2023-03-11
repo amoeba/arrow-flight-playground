@@ -1,17 +1,18 @@
 # test_flight_stress
 
-Various scripts for stress testing Apache Arrow Flight.
+Example of using Apache Arrow Flight w/ OpenTelemetry.
+The Flight Client simulates a mixed workload and neither the Client or Server are necessarily representative of a real Flight Client and Server.
 
-## Setup
+## Pre-reqs
 
-Conda `environment.yml` files are provided in this directory for setting up a PyArrow/Arrow environment.
+- Docker, `docker-compose`
 
-- `environment-8.yml`: For Arrow 8
-- `environment-9.yml`: For Arrow 9
+## Running
 
-## Contents
+This takes a while because the server is built in-container.
 
-- `client`: Python and C++ Flight clients for stress testing `GetFlightInfo`
-- `server`: Server for responding to `GetFlightInfo` requests
+```sh
+docker-compose  up
+```
 
-See README's in each subdir for more instructions.
+Once all containers are up, visit http://localhost:16686 to see the Jaeger UI and look at traces.
