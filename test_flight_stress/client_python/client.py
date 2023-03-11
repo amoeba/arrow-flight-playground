@@ -1,3 +1,4 @@
+import os
 from typing import List
 
 import pyarrow as pa
@@ -9,9 +10,9 @@ from tracing_middleware import ClientTracingMiddlewareFactory
 tracer = trace.get_tracer(__name__)
 
 class StorageServiceClient:
-    def __init__(self, port: int=5001):
-        self.conn = flight.connect(f"grpc+tcp://localhost:{port}",
-                                   middleware=[ClientTracingMiddlewareFactory()])
+    def __init__(self):
+        uri = os.environ.get("FLIGHT_SERVER_URI", "grpc+tcp://localhost:5000")
+        self.conn = flight.connect(uri, middleware=[ClientTracingMiddlewareFactory()])
 
     def list_datasets(self) -> List[str]:
         with tracer.start_as_current_span("StorageServiceClient.list_datasets") as current_span:

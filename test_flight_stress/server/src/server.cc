@@ -46,6 +46,16 @@ namespace propagation = opentelemetry::context;
 namespace context = opentelemetry::context;
 
 
+// Helper function to get an environment variable w/ a fallback
+inline std::string env(const char* key, const char* fallback) {
+    const char* value = std::getenv(key);
+
+    if (value == nullptr) {
+        return std::string { fallback };
+    }
+
+    return std::string { value };
+}
 
 using Status = arrow::Status;
 
@@ -264,7 +274,7 @@ void ConfigureTraceExport()
 
   // Use gRPC OTLP export for Jaeger
   otlp::OtlpGrpcExporterOptions opts;
-  opts.endpoint = "http://jaegar:4317";
+  opts.endpoint = env("OPENTELEMETRY_COLLECTOR_URI", "http://jaeger:4317");
   auto otlp_exporter = otlp::OtlpGrpcExporterFactory::Create(opts);
   auto otlp_processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(otlp_exporter));
 
@@ -291,8 +301,9 @@ Status serve(int32_t port)
   ConfigureTraceExport();
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
-  ARROW_RETURN_NOT_OK(fs->CreateDir("./flight_datasets/"));
-  auto root = std::make_shared<arrow::fs::SubTreeFileSystem>("./flight_datasets/", fs);
+  auto flight_data_dir = env("FLIGHT_DATASET_DIR", "./flight_datasets/");
+  ARROW_RETURN_NOT_OK(fs->CreateDir(flight_data_dir));
+  auto root = std::make_shared<arrow::fs::SubTreeFileSystem>(flight_data_dir, fs);
 
   flight::Location server_location;
   ARROW_ASSIGN_OR_RAISE(server_location,

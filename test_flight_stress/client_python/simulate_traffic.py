@@ -1,3 +1,5 @@
+import os
+import time
 import uuid
 import concurrent.futures
 
@@ -16,7 +18,8 @@ resource = Resource(attributes={
 })
 
 provider = TracerProvider(resource=resource)
-processor = BatchSpanProcessor(OTLPSpanExporter(endpoint="http://localhost:4317"))
+COLLECTOR_URI = os.environ.get("OPENTELEMETRY_COLLECTOR_URI", "http://localhost:4317")
+processor = BatchSpanProcessor(OTLPSpanExporter(endpoint=COLLECTOR_URI))
 provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
 
