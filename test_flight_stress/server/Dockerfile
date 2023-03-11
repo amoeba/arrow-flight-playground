@@ -5,8 +5,9 @@ ARG build_type=Release
 # Dependency versions
 ARG absl_version=20230125.1
 ARG protobuf_version=3.20.0
-ARG grpc_version=1.35.0
-ARG arrow_version=8.0.0
+ARG grpc_version=1.52.0
+ARG arrow_version=11.0.0
+ARG otel_version=1.8.1
 
 RUN --mount=type=cache,target=/var/cache/apt \
     apt-get update && \
@@ -18,7 +19,8 @@ RUN --mount=type=cache,target=/var/cache/apt \
     ccache \
     git \
     libssl-dev \
-    wget
+    wget \
+    libcurl4-openssl-dev
 
 # Build and install absl
 RUN git clone --branch ${absl_version} --depth 1 https://github.com/abseil/abseil-cpp && \
@@ -57,6 +59,22 @@ RUN git clone --branch v${grpc_version} https://github.com/grpc/grpc && \
         . && \
     cmake --build . --target install --parallel 4
 
+# Build and install opentelemetry
+RUN git clone --branch v${otel_version} --recursive https://github.com/open-telemetry/opentelemetry-cpp && \
+    cd opentelemetry-cpp && \
+    cmake \
+        -DCMAKE_BUILD_TYPE=${build_type} \
+        -DBUILD_TESTING=OFF \
+        -DWITH_EXAMPLES_HTTP=ON \
+        -DWITH_OTLP=ON \
+        -DWITH_OTLP_HTTP=ON \
+        -DWITH_OTLP_GRPC=ON \
+        -DWITH_PROMETHEUS=ON \
+        -DCMAKE_CXX_STANDARD=17 \
+        -DCMAKE_CXX_FLAGS=-fPIC \
+        . && \
+    cmake --build . --target install --parallel 4
+
 # Build and install Arrow
 RUN git clone --branch apache-arrow-${arrow_version} --depth 1 https://github.com/apache/arrow && \
     mkdir arrow/cpp/build && \
@@ -70,11 +88,13 @@ RUN git clone --branch apache-arrow-${arrow_version} --depth 1 https://github.co
         -DARROW_PARQUET=ON \
         -DARROW_FLIGHT=ON \
         -DARROW_FILESYSTEM=ON \
+        -DARROW_WITH_OPENTELEMETRY=ON \
         -DARROW_DEPENDENCY_SOURCE=BUNDLED \
         -Dabsl_SOURCE=SYSTEM \
         -DRE2_SOURCE=SYSTEM \
         -DProtobuf_SOURCE=SYSTEM \
         -DgRPC_SOURCE=SYSTEM \
+        -Dopentelemetry-cpp_SOURCE=SYSTEM \
         .. && \
     cmake --build . --target install --parallel 4
 
@@ -93,4 +113,5 @@ ENV LD_LIBRARY_PATH=/usr/local/lib
 
 CMD ./server 5000
 
+# Flight server
 EXPOSE 5000/tcp
