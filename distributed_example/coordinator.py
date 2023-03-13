@@ -7,7 +7,7 @@ class CoordinatorServer(pa.flight.FlightServerBase):
     def __init__(self, location="grpc://0.0.0.0:8888", **kwargs):
         super(CoordinatorServer, self).__init__(location, **kwargs)
 
-        self.available_datasets = []
+        self.available_datasets = {}
 
     def _make_flight_info(self, dataset):
         dataset_path = self._repo / dataset
@@ -21,29 +21,52 @@ class CoordinatorServer(pa.flight.FlightServerBase):
         )
 
     def list_flights(self, context, criteria):
-        for dataset in self._repo.iterdir():
-            yield self._make_flight_info(dataset.name)
+        for dataset in self.available_datasets:
+            for flight_info in self.available_datasets[dataset]:
+                yield flight_info
 
     def get_flight_info(self, context, descriptor):
         return self._make_flight_info(descriptor.path[0].decode("utf-8"))
 
     def list_actions(self, context):
         return [
-            ("offer_dataset", "Offers a dataset to the coordinator"),
+            ("say_hello", "Receive a Say Hello message from a data server"),
         ]
 
     def do_action(self, context, action):
-        if action.type == "register_dataset":
-            print("do_action register_dataset")
-            # TODO: How to receive a FlightInfo from the DataServer
-            self.register_dataset(context, action.body.to_pybytes().decode("utf-8"))
+        if action.type == "say_hello":
+            print(f"do_action say_hello from peer {context.peer()}")
+            self.receive_hello(context.peer())
         else:
             raise NotImplementedError
 
-    def register_dataset(self, context, dataset):
-        print(f"Received register_dataset request for {dataset}")
-        self.available_datasets.append(dataset)
-        return dataset
+    def receive_hello(self, peer):
+        print(f"receive_hello from {peer}")
+
+        # HACK: Turn peer into grpc URI
+        # dest = peer.replace("ipv4:", "grpc://")
+
+        # print(f"Connecting to {dest}")
+        # TODO: Detect instead of hard-code
+        tempclient = pyarrow.flight.connect("grpc://localhost:8889")
+
+        for info in tempclient.list_flights():
+            print(
+                f"Registering FlightInfo for {info.descriptor.path[0].decode('utf-8')}"
+            )
+            self.register_dataset(info)
+
+    def register_dataset(self, flight_info):
+        print(f"Received register_dataset request for {flight_info}")
+
+        path = flight_info.descriptor.path[0].decode("utf-8")
+
+        if path not in self.available_datasets:
+            self.available_datasets[path] = []
+
+        self.available_datasets[path].append(flight_info)
+
+        return "OK"
 
 
 if __name__ == "__main__":

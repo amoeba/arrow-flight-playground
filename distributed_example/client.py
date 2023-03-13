@@ -7,7 +7,8 @@ import pyarrow.flight as flight
 
 class ExampleClient:
     def __init__(self):
-        uri = os.environ.get("FLIGHT_SERVER_URI", "grpc+tcp://localhost:8888")
+        uri = os.environ.get("FLIGHT_SERVER_URI", "grpc://localhost:8888")
+        print(uri)
         self.conn = flight.connect(uri)
 
     def list_datasets(self) -> List[str]:
@@ -16,4 +17,6 @@ class ExampleClient:
 
 if __name__ == "__main__":
     c = ExampleClient()
-    print(c.list_datasets())
+
+    for ds in c.list_datasets():
+        print(ds)
