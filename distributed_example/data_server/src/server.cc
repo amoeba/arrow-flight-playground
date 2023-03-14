@@ -1,3 +1,5 @@
+#include <thread>
+
 // This example was taken from the apache arrow cookbook
 #include <arrow/buffer.h>
 #include <arrow/filesystem/filesystem.h>
@@ -58,20 +60,15 @@ inline std::string env(const char *key, const char *fallback)
   return std::string{value};
 }
 
+using namespace std::chrono_literals;
 using Status = arrow::Status;
 
-class DistributedFlightCoordinatorServer : public flight::FlightServerBase
+class DistributedFlightDataServer : public flight::FlightServerBase
 {
 public:
-  const flight::ActionType kActionDropDataset{"drop_dataset", "Delete a dataset."};
-  const flight::ActionType kActionSayHello{"say_hello", "Say hello."};
+  const flight::ActionType kActionSayHello{"say_hello", "Say Hello."};
 
-  std::unordered_map<std::string, std::string> available_datasets;
-
-  // Ref to the client we use to talk to data servers
-  std::unique_ptr<arrow::flight::FlightClient> client;
-
-  explicit DistributedFlightCoordinatorServer(std::shared_ptr<arrow::fs::FileSystem> root)
+  explicit DistributedFlightDataServer(std::shared_ptr<arrow::fs::FileSystem> root)
       : root_(std::move(root))
   {
     // This gets the global tracer that has been set in ConfigureTraceExport.
@@ -80,17 +77,51 @@ public:
     tracer_ = provider->GetTracer("example_flight_server", "0.0.1");
 
     // Connect our client
+
+    // Set up a temporary sleep
+    std::this_thread::sleep_for(5s);
+
     arrow::flight::Location location;
-    auto other_host = env("DATA_SERVER_HOST", "localhost");
-    auto other_port = env("DATA_SERVER_PORT", "5000");
-    arrow::Result<arrow::flight::Location>
-        location_result = arrow::flight::Location::ForGrpcTcp(other_host, std::stoi(other_port));
-    location = location_result.ValueOrDie();
+    auto coordinator_host = env("COORDINATOR_SERVER_HOST", "localhost");
+    auto coordinator_port = env("COORDINATORSERVER_PORT", "localhost");
 
-    auto result = arrow::flight::FlightClient::Connect(location);
-    client = std::move(result.ValueOrDie());
+    std::cout << "About to connect..." << std::endl;
 
-    std::cout << "Client for CoordinatorServer connected to " << location.ToString() << std::endl;
+    while (true)
+    {
+      auto location_result = arrow::flight::Location::ForGrpcTcp(coordinator_host, std::stoi(coordinator_port));
+
+      if (!location_result.ok())
+      {
+        std::cout << "Failed to connect " << location_result.status().message() << std::endl;
+        std::cout << "Sleeping..." << std::endl;
+        std::this_thread::sleep_for(1s);
+
+        continue;
+      }
+
+      std::cout << "Location is ok..." << std::endl;
+
+      location = location_result.ValueOrDie();
+
+      auto connect_result = arrow::flight::FlightClient::Connect(location);
+
+      if (!connect_result.ok())
+      {
+        std::cout << "Failed to connect " << connect_result.status().message() << std::endl;
+        std::cout << "Sleeping..." << std::endl;
+        std::this_thread::sleep_for(1s);
+
+        continue;
+      }
+
+      std::cout << "Connect is ok..." << std::endl;
+
+      client = std::move(connect_result.ValueOrDie());
+      break;
+    }
+
+    std::cout << "Client for DataServer connected to " << location.ToString() << std::endl;
   }
 
   void PrintTraceContext(const flight::ServerCallContext &context)
@@ -205,7 +236,7 @@ public:
   Status ListActions(const flight::ServerCallContext &,
                      std::vector<flight::ActionType> *actions) override
   {
-    *actions = {kActionDropDataset, kActionSayHello};
+    *actions = {};
     return Status::OK();
   }
 
@@ -213,17 +244,40 @@ public:
                   const flight::Action &action,
                   std::unique_ptr<flight::ResultStream> *result) override
   {
-    if (action.type == kActionSayHello.type)
+    return Status::NotImplemented("YUnknown action type: ", action.type);
+  }
+
+  void SayHello()
+  {
+    arrow::flight::Action action;
+    action.type = kActionSayHello.type;
+    action.body = arrow::Buffer::FromString("Hello!");
+
+    std::cout << "About to call DoAction..." << std::endl;
+    auto stream_result = client->DoAction(action);
+    std::cout << "About to call ValueOrDie..." << std::endl;
+    auto stream = std::move(stream_result.ValueOrDie());
+
+    while (true)
     {
-      *result = std::unique_ptr<flight::ResultStream>(
-          new flight::SimpleResultStream({}));
-      return DoActionSayHello(action.body->ToString());
+      std::cout << "About to call stream->Next()..." << std::endl;
+
+      auto x = stream->Next();
+
+      if (x == nullptr)
+      {
+        break;
+      }
+
+      auto y = std::move(x.ValueOrDie());
+
+      std::cout << y->body->ToString() << std::endl;
     }
-    return Status::NotImplemented("XUnknown action type: ", action.type);
   }
 
 private:
-  arrow::Result<flight::FlightInfo> MakeFlightInfo(
+  arrow::Result<flight::FlightInfo>
+  MakeFlightInfo(
       const arrow::fs::FileInfo &file_info)
   {
     auto span = tracer_->StartSpan("MakeFlightInfo");
@@ -269,47 +323,17 @@ private:
     return root_->GetFileInfo(descriptor.path[0]);
   }
 
-  Status DoActionSayHello(const std::string &message)
-  {
-    auto span = tracer_->StartSpan("DoActionSayHello");
-    span->SetAttribute("say_hello", message);
-    auto scope = tracer_->WithActiveSpan(span);
-
-    span->SetAttribute("size before", available_datasets.size());
-    available_datasets[message] = message;
-    span->SetAttribute("size after", available_datasets.size());
-
-    // Call ListFlights against other server
-    auto listing_result = client->ListFlights();
-    auto listing = std::move(listing_result.ValueOrDie());
-
-    while (true)
-    {
-      auto x = listing->Next();
-      if (x == nullptr)
-      {
-        std::cout << "No more results" << std::endl;
-        break;
-      }
-
-      auto fi = std::move(x.ValueOrDie());
-      auto desc = fi->descriptor();
-      std::cout << desc.ToString() << std::endl;
-    }
-
-    return Status::OK();
-  }
-
   std::shared_ptr<arrow::fs::FileSystem> root_;
   nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
-}; // end DistributedFlightCoordinatorServer
+  std::unique_ptr<arrow::flight::FlightClient> client;
+}; // end DistributedFlightDataServer
 
 void ConfigureTraceExport()
 {
   // Create this server as a resource
   // See also: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service
   auto resource = opentelemetry::sdk::resource::Resource::Create({
-      {"service.name", "server_coordinator"},
+      {"service.name", "server_data"},
       {"service.namespace", "DistributedFlight"},
       {"service.instance.id", "localhost"},
       {"service.version", "1.0.0"},
@@ -353,8 +377,8 @@ Status serve(int32_t port)
                         flight::Location::ForGrpcTcp("0.0.0.0", port));
 
   flight::FlightServerOptions options(server_location);
-  auto server = std::unique_ptr<flight::FlightServerBase>(
-      new DistributedFlightCoordinatorServer(std::move(root)));
+  auto server = std::unique_ptr<DistributedFlightDataServer>(
+      new DistributedFlightDataServer(std::move(root)));
 
   // Must call this before server->Init();
   // grpc::channelz::experimental::InitChannelzService();
@@ -364,6 +388,10 @@ Status serve(int32_t port)
                                   flight::MakeTracingServerMiddlewareFactory());
 
   ARROW_RETURN_NOT_OK(server->Init(options));
+
+  // TODO: Connect a client and say hello
+  server->SayHello();
+
   std::cout << "Listening on port " << server->port() << std::endl;
   ARROW_RETURN_NOT_OK(server->Serve());
   return Status::OK();

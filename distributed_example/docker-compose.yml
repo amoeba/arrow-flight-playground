@@ -1,30 +1,57 @@
 version: "3.9"
 services:
-  client:
-    build: .
-    environment:
-      - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
-    command:
-      - python3
-      - -u
-      - client.py
+  # client:
+  #   build: .
+  #   environment:
+  #     - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
+  #   command:
+  #     - python3
+  #     - -u
+  #     - client.py
+  # coordinator:
+  #   build: .
+  #   ports:
+  #     - "8888:8888"
+  #   environment:
+  #     - FLIGHT_DATA_URI=grpc://data:8889
+  #   command:
+  #     - python3
+  #     - -u
+  #     - coordinator.py
+  # data:
+  #   build: .
+  #   environment:
+  #     - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
+  #   volumes:
+  #     - /Users/bryce/Data:/data:ro
+  #   command:
+  #     - python3
+  #     - -u
+  #     - data.py
   coordinator:
-    build: .
+    build: ./server
+    environment:
+      - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
+      - DATA_SERVER_HOST=data
+      - DATA_SERVER_PORT=8889
     ports:
-      - "8888:8888"
-    environment:
-      - FLIGHT_DATA_URI=grpc://data:8889
-    command:
-      - python3
-      - -u
-      - coordinator.py
+      - 8888:5000
   data:
-    build: .
+    build: ./data_server
     environment:
-      - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
+      - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
+      - COORDINATOR_URI=grpc://coordinator:5000
+      - COORDINATOR_SERVER_HOST=coordinator
+      - COORDINATORSERVER_PORT=8888
+      - FLIGHT_DATASET_DIR=/data
+    ports:
+      - 8889:5000
     volumes:
-      - /Users/bryce/Data:/data:ro
-    command:
-      - python3
-      - -u
-      - data.py
+      - ./flight_datasets:/data
+  # jaeger:
+  #   image: jaegertracing/all-in-one:latest
+  #   environment:
+  #     - COLLECTOR_OTLP_ENABLED=true
+  #   ports:
+  #     - "16686:16686"
+  #     - "4317:4317"
