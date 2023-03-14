@@ -1,3 +1,5 @@
+import os
+
 import pyarrow as pa
 import pyarrow.flight
 import pyarrow.parquet
@@ -36,28 +38,28 @@ class CoordinatorServer(pa.flight.FlightServerBase):
     def do_action(self, context, action):
         if action.type == "say_hello":
             print(f"do_action say_hello from peer {context.peer()}")
-            self.receive_hello(context.peer())
+            self.receive_hello(context)
         else:
             raise NotImplementedError
 
-    def receive_hello(self, peer):
-        print(f"receive_hello from {peer}")
+    def receive_hello(self, context):
+        uri = os.environ.get("FLIGHT_DATA_URI", "grpc://localhost:8889")
+        print(f"Connecting to {uri} to list flights...")
 
-        # HACK: Turn peer into grpc URI
-        # dest = peer.replace("ipv4:", "grpc://")
+        client = pyarrow.flight.connect(uri)
 
-        # print(f"Connecting to {dest}")
-        # TODO: Detect instead of hard-code
-        tempclient = pyarrow.flight.connect("grpc://localhost:8889")
-
-        for info in tempclient.list_flights():
+        for info in client.list_flights():
             print(
                 f"Registering FlightInfo for {info.descriptor.path[0].decode('utf-8')}"
             )
             self.register_dataset(info)
 
+        return "OK"
+
     def register_dataset(self, flight_info):
-        print(f"Received register_dataset request for {flight_info}")
+        print(
+            f"Received register_dataset request for {flight_info.descriptor.path[0].decode('utf-8')}"
+        )
 
         path = flight_info.descriptor.path[0].decode("utf-8")
 
@@ -65,8 +67,6 @@ class CoordinatorServer(pa.flight.FlightServerBase):
             self.available_datasets[path] = []
 
         self.available_datasets[path].append(flight_info)
-
-        return "OK"
 
 
 if __name__ == "__main__":
