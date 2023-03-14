@@ -1,43 +1,17 @@
 version: "3.9"
 services:
-  # client:
-  #   build: .
-  #   environment:
-  #     - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
-  #   command:
-  #     - python3
-  #     - -u
-  #     - client.py
-  # coordinator:
-  #   build: .
-  #   ports:
-  #     - "8888:8888"
-  #   environment:
-  #     - FLIGHT_DATA_URI=grpc://data:8889
-  #   command:
-  #     - python3
-  #     - -u
-  #     - coordinator.py
-  # data:
-  #   build: .
-  #   environment:
-  #     - FLIGHT_COORDINATOR_URI=grpc://coordinator:8888
-  #   volumes:
-  #     - /Users/bryce/Data:/data:ro
-  #   command:
-  #     - python3
-  #     - -u
-  #     - data.py
   coordinator:
-    build: ./server
+    build: .
+    command: ./coordinator
     environment:
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
       - DATA_SERVER_HOST=data
       - DATA_SERVER_PORT=8889
     ports:
       - 8888:5000
-  data:
-    build: ./data_server
+  server:
+    build: ./
+    command: ./server
     environment:
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
       - COORDINATOR_URI=grpc://coordinator:5000

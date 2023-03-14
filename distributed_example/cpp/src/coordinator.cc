@@ -341,7 +341,10 @@ void ConfigureTraceExport()
 // TODO: how to sample?
 Status serve(int32_t port)
 {
-  // ConfigureTraceExport();
+  // if (env("OTEL_ENABLED", "") ! = "")
+  // {
+  //   ConfigureTraceExport();
+  // }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   auto flight_data_dir = env("FLIGHT_DATASET_DIR", "./flight_datasets/");
