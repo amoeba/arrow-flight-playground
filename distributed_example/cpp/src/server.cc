@@ -36,6 +36,8 @@
 #include <vector>
 #include <iostream>
 
+#include "common.h"
+
 // TODO: Check this out: https://github.com/apache/arrow/pull/12702
 
 namespace flight = arrow::flight;
@@ -46,19 +48,6 @@ namespace trace_sdk = opentelemetry::sdk::trace;
 namespace trace_exporter = opentelemetry::exporter::trace;
 namespace propagation = opentelemetry::context;
 namespace context = opentelemetry::context;
-
-// Helper function to get an environment variable w/ a fallback
-inline std::string env(const char *key, const char *fallback)
-{
-  const char *value = std::getenv(key);
-
-  if (value == nullptr)
-  {
-    return std::string{fallback};
-  }
-
-  return std::string{value};
-}
 
 using namespace std::chrono_literals;
 using Status = arrow::Status;
@@ -74,65 +63,9 @@ public:
     // This gets the global tracer that has been set in ConfigureTraceExport.
     // tracer_ is used to create spans.
     auto provider = trace::Provider::GetTracerProvider();
-    tracer_ = provider->GetTracer("example_flight_server", "0.0.1");
+    tracer_ = provider->GetTracer("distributed_flight_test", "0.0.1");
 
-    // Connect our client
-
-    // Set up a temporary sleep
-    std::this_thread::sleep_for(5s);
-
-    arrow::flight::Location location;
-    auto coordinator_host = env("COORDINATOR_SERVER_HOST", "localhost");
-    auto coordinator_port = env("COORDINATORSERVER_PORT", "localhost");
-
-    std::cout << "About to connect..." << std::endl;
-
-    while (true)
-    {
-      auto location_result = arrow::flight::Location::ForGrpcTcp(coordinator_host, std::stoi(coordinator_port));
-
-      if (!location_result.ok())
-      {
-        std::cout << "Failed to connect " << location_result.status().message() << std::endl;
-        std::cout << "Sleeping..." << std::endl;
-        std::this_thread::sleep_for(1s);
-
-        continue;
-      }
-
-      std::cout << "Location is ok..." << std::endl;
-
-      location = location_result.ValueOrDie();
-
-      auto connect_result = arrow::flight::FlightClient::Connect(location);
-
-      if (!connect_result.ok())
-      {
-        std::cout << "Failed to connect " << connect_result.status().message() << std::endl;
-        std::cout << "Sleeping..." << std::endl;
-        std::this_thread::sleep_for(1s);
-
-        continue;
-      }
-
-      std::cout << "Connect is ok..." << std::endl;
-
-      client = std::move(connect_result.ValueOrDie());
-      break;
-    }
-
-    std::cout << "Client for DataServer connected to " << location.ToString() << std::endl;
-  }
-
-  void PrintTraceContext(const flight::ServerCallContext &context)
-  {
-    auto *middleware =
-        reinterpret_cast<flight::TracingServerMiddleware *>(context.GetMiddleware("tracing"));
-    std::cout << "Trace context: " << std::endl;
-    for (auto pair : middleware->GetTraceContext())
-    {
-      std::cout << "  " << pair.key << ": " << pair.value << std::endl;
-    }
+    this->ConnectInternalClient();
   }
 
   Status ListFlights(
@@ -140,6 +73,9 @@ public:
       std::unique_ptr<flight::FlightListing> *listings) override
   {
     PrintTraceContext(context);
+
+    auto span = tracer_->StartSpan("ListFlightsImpl");
+    auto scope = tracer_->WithActiveSpan(span);
 
     arrow::fs::FileSelector selector;
     selector.base_dir = "/";
@@ -180,6 +116,7 @@ public:
                std::unique_ptr<flight::FlightMetadataWriter>) override
   {
     PrintTraceContext(context);
+
     ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(reader->descriptor()));
     ARROW_ASSIGN_OR_RAISE(auto sink, root_->OpenOutputStream(file_info.path()));
 
@@ -233,49 +170,67 @@ public:
     return Status::OK();
   }
 
-  Status ListActions(const flight::ServerCallContext &,
+  Status ListActions(const flight::ServerCallContext &context,
                      std::vector<flight::ActionType> *actions) override
   {
+
+    PrintTraceContext(context);
+
     *actions = {};
     return Status::OK();
   }
 
-  Status DoAction(const flight::ServerCallContext &,
+  Status DoAction(const flight::ServerCallContext &context,
                   const flight::Action &action,
                   std::unique_ptr<flight::ResultStream> *result) override
   {
-    return Status::NotImplemented("YUnknown action type: ", action.type);
+
+    PrintTraceContext(context);
+
+    return Status::NotImplemented("Unknown action type: ", action.type);
   }
 
   void SayHello()
   {
+    auto span = tracer_->StartSpan("SayHello");
+    auto scope = tracer_->WithActiveSpan(span);
+
     arrow::flight::Action action;
     action.type = kActionSayHello.type;
     action.body = arrow::Buffer::FromString("Hello!");
 
-    std::cout << "About to call DoAction..." << std::endl;
     auto stream_result = client->DoAction(action);
-    std::cout << "About to call ValueOrDie..." << std::endl;
     auto stream = std::move(stream_result.ValueOrDie());
 
     while (true)
     {
-      std::cout << "About to call stream->Next()..." << std::endl;
+      auto piece = stream->Next();
 
-      auto x = stream->Next();
-
-      if (x == nullptr)
+      if (piece == nullptr)
       {
         break;
       }
 
-      auto y = std::move(x.ValueOrDie());
-
-      std::cout << y->body->ToString() << std::endl;
+      std::cout << piece.ValueOrDie()->body->ToString() << std::endl;
     }
   }
 
 private:
+  void ConnectInternalClient()
+  {
+    auto host = env("COORDINATOR_SERVER_HOST", "localhost");
+    auto port = env("COORDINATORSERVER_PORT", "localhost");
+
+    arrow::flight::Location location;
+    auto location_result = arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
+    location = location_result.ValueOrDie();
+
+    auto result = arrow::flight::FlightClient::Connect(location);
+    client = std::move(result.ValueOrDie());
+
+    std::cout << "Client for DataServer connected to " << location.ToString() << std::endl;
+  }
+
   arrow::Result<flight::FlightInfo>
   MakeFlightInfo(
       const arrow::fs::FileInfo &file_info)
@@ -328,47 +283,13 @@ private:
   std::unique_ptr<arrow::flight::FlightClient> client;
 }; // end DistributedFlightDataServer
 
-void ConfigureTraceExport()
-{
-  // Create this server as a resource
-  // See also: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service
-  auto resource = opentelemetry::sdk::resource::Resource::Create({
-      {"service.name", "server_data"},
-      {"service.namespace", "DistributedFlight"},
-      {"service.instance.id", "localhost"},
-      {"service.version", "1.0.0"},
-  });
-
-  // Use gRPC OTLP export for Jaeger
-  otlp::OtlpGrpcExporterOptions opts;
-  opts.endpoint = env("OPENTELEMETRY_COLLECTOR_URI", "http://localhost:4317");
-  auto otlp_exporter = otlp::OtlpGrpcExporterFactory::Create(opts);
-  auto otlp_processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(otlp_exporter));
-
-  std::shared_ptr<trace_sdk::TracerProvider> provider =
-      std::make_shared<trace_sdk::TracerProvider>(std::move(otlp_processor), resource);
-
-  // For debugging, uncomment the OStream exporter to get traces send to stdout.
-  // auto os_exporter = trace_exporter::OStreamSpanExporterFactory::Create();
-  // auto os_processor = trace_sdk::SimpleSpanProcessorFactory::Create(std::move(os_exporter));
-  // provider->AddProcessor(std::move(os_processor));
-
-  // Set the global trace provider
-  trace::Provider::SetTracerProvider(std::dynamic_pointer_cast<trace::TracerProvider>(provider));
-
-  // You must add this, or else the traces will not be propagated from the client.
-  context::propagation::GlobalTextMapPropagator::SetGlobalPropagator(
-      opentelemetry::nostd::shared_ptr<context::propagation::TextMapPropagator>(
-          new opentelemetry::trace::propagation::HttpTraceContext()));
-}
-
 // TODO: how to sample?
 Status serve(int32_t port)
 {
-  // if (env("OTEL_ENABLED", "") ! = "")
-  // {
-  //   ConfigureTraceExport();
-  // }
+  if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
+  {
+    ConfigureTraceExport();
+  }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   auto flight_data_dir = env("FLIGHT_DATASET_DIR", "./flight_datasets/");
@@ -402,6 +323,8 @@ Status serve(int32_t port)
 
 int main(int argc, char **argv)
 {
+  std::this_thread::sleep_for(1s);
+
   int32_t port = argc > 1 ? std::atoi(argv[1]) : 5000;
 
   Status st = serve(port);

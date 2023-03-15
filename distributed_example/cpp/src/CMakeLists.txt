@@ -3,7 +3,8 @@ project(arrow-distributed-flight-server)
 
 set(CMAKE_CXX_STANDARD 17)
 
-find_package(Arrow CONFIG)
+find_package(opentelemetry-cpp CONFIG REQUIRED)
+find_package(Arrow CONFIG REQUIRED)
 
 add_executable(
     coordinator

@@ -2,30 +2,27 @@ version: "3.9"
 services:
   coordinator:
     build: .
-    command: ./coordinator
+    command: ./coordinator 8888
     environment:
+      - OPENTELEMETRY_ENABLED=TRUE
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
-      - DATA_SERVER_HOST=data
+      - DATA_SERVER_HOST=server
       - DATA_SERVER_PORT=8889
-    ports:
-      - 8888:5000
   server:
     build: ./
-    command: ./server
+    command: ./server 8889
     environment:
+      - OPENTELEMETRY_ENABLED=TRUE
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
-      - COORDINATOR_URI=grpc://coordinator:5000
       - COORDINATOR_SERVER_HOST=coordinator
       - COORDINATORSERVER_PORT=8888
       - FLIGHT_DATASET_DIR=/data
-    ports:
-      - 8889:5000
     volumes:
       - ./flight_datasets:/data
-  # jaeger:
-  #   image: jaegertracing/all-in-one:latest
-  #   environment:
-  #     - COLLECTOR_OTLP_ENABLED=true
-  #   ports:
-  #     - "16686:16686"
-  #     - "4317:4317"
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"
+      - "4317:4317"
