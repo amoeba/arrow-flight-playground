@@ -1,0 +1,7 @@
+pyarrow
+opentelemetry-sdk
+opentelemetry-api
+opentelemetry-exporter-jaeger
+opentelemetry-exporter-jaeger-proto-grpc
+opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-exporter-otlp-proto-http

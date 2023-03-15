@@ -1,6 +1,5 @@
 import os
 
-import pandas
 import pyarrow as pa
 import pyarrow.flight as flight
 
@@ -76,7 +75,6 @@ def main():
                     table = reader.read_all()
 
                     do_get_span.set_attribute("num_rows", table.num_rows)
-                    do_get_span.set_attribute("num_cols", table.num_cols)
 
         list_all_flights_span.set_attribute("num_flights", n_flights)
 
