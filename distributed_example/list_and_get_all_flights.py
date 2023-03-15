@@ -1,6 +1,4 @@
 import os
-import time
-from typing import List
 
 import pandas
 import pyarrow as pa
@@ -23,6 +21,7 @@ processor = BatchSpanProcessor(
 )
 provider.add_span_processor(processor)
 trace.set_tracer_provider(provider)
+tracer = trace.get_tracer(__name__, "0.0.1")
 
 
 class ClientTracingMiddlewareFactory(flight.ClientMiddlewareFactory):
@@ -54,28 +53,33 @@ class ClientTracingMiddleware(flight.ClientMiddleware):
         self._span.end()
 
 
-# TODO: Figure out if I really need two separate Flight Clients. I think I do?
-coordinator_client = pa.flight.connect(
-    "grpc://0.0.0.0:8888",
-    middleware=[ClientTracingMiddlewareFactory()],
-)
+def main():
+    coordinator_client = pa.flight.connect(
+        "grpc://0.0.0.0:8888",
+        middleware=[ClientTracingMiddlewareFactory()],
+    )
 
-server_client = pa.flight.connect(
-    "grpc://0.0.0.0:8889",
-    middleware=[ClientTracingMiddlewareFactory()],
-)
+    with tracer.start_as_current_span(
+        "list_and_get_all_flights"
+    ) as list_all_flights_span:
+        n_flights = 0
+        for flight_info in coordinator_client.list_flights():
+            n_flights += 1
+            with tracer.start_as_current_span("get_single_flight"):
+                with tracer.start_as_current_span("connect_temp_client"):
+                    temp_client = pa.flight.connect(
+                        flight_info.endpoints[0].locations[0].uri,
+                        middleware=[ClientTracingMiddlewareFactory()],
+                    )
+                with tracer.start_as_current_span("do_get") as do_get_span:
+                    reader = temp_client.do_get(flight_info.endpoints[0].ticket)
+                    table = reader.read_all()
 
+                    do_get_span.set_attribute("num_rows", table.num_rows)
+                    do_get_span.set_attribute("num_cols", table.num_cols)
 
-def do_work():
-    tracer = trace.get_tracer(__name__)
-
-    with tracer.start_as_current_span("list_all_flights") as laf_span:
-        for f in coordinator_client.list_flights():
-            print(f)
-            with tracer.start_as_current_span("do_get") as dg_span:
-                reader = server_client.do_get(f.endpoints[0].ticket)
-                print(reader.read_pandas())
+        list_all_flights_span.set_attribute("num_flights", n_flights)
 
 
 if __name__ == "__main__":
-    do_work()
+    main()

@@ -146,8 +146,6 @@ public:
                const flight::Ticket &request,
                std::unique_ptr<flight::FlightDataStream> *stream) override
   {
-    std::cout << "Server DoPut" << std::endl;
-
     PrintTraceContext(context);
 
     ARROW_ASSIGN_OR_RAISE(auto input, root_->OpenInputFile(request.ticket));
@@ -330,8 +328,6 @@ Status serve(int32_t port)
 
 int main(int argc, char **argv)
 {
-  std::this_thread::sleep_for(1s);
-
   int32_t port = argc > 1 ? std::atoi(argv[1]) : 5000;
 
   Status st = serve(port);

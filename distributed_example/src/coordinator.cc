@@ -148,14 +148,14 @@ private:
 
     while (true)
     {
-      auto x = listing->Next();
-      if (x == nullptr)
+      auto flight_info_result = listing->Next();
+      if (flight_info_result == nullptr)
       {
         std::cout << "No more results" << std::endl;
         break;
       }
 
-      available_datasets[message] = std::move(x.ValueOrDie());
+      available_datasets[message] = std::move(flight_info_result.ValueOrDie());
       auto desc = available_datasets[message]->descriptor();
       std::cout << desc.ToString() << std::endl;
     }
