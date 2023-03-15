@@ -72,36 +72,15 @@ public:
   {
     PrintTraceContext(context);
 
-    // arrow::fs::FileSelector selector;
-    // selector.base_dir = "/";
-    // ARROW_ASSIGN_OR_RAISE(auto listing, root_->GetFileInfo(selector));
+    std::vector<flight::FlightInfo> flights;
 
-    // std::vector<flight::FlightInfo> flights;
-    // for (const auto &file_info : listing)
-    // {
-    //   if (!file_info.IsFile() || file_info.extension() != "parquet")
-    //     continue;
-    //   ARROW_ASSIGN_OR_RAISE(auto info, MakeFlightInfo(file_info));
-    //   flights.push_back(std::move(info));
-    // }
+    for (const auto &info : this->available_datasets)
+    {
+      std::cout << info.first << ": " << info.second->descriptor().path[0] << std::endl;
 
-    // *listings = std::unique_ptr<flight::FlightListing>(
-    //     new flight::SimpleFlightListing(std::move(flights)));
-    return Status::OK();
-  }
-
-  Status GetFlightInfo(const flight::ServerCallContext &context,
-                       const flight::FlightDescriptor &descriptor,
-                       std::unique_ptr<flight::FlightInfo> *info) override
-  {
-    PrintTraceContext(context);
-
-    std::cout << descriptor.ToString() << std::endl;
-
-    // ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(descriptor));
-    // ARROW_ASSIGN_OR_RAISE(auto flight_info, MakeFlightInfo(file_info));
-    // *info = std::unique_ptr<flight::FlightInfo>(
-    //     new flight::FlightInfo(std::move(flight_info)));
+      // TODO: move is wrong
+      flights.push_back(std::move(info.second));
+    }
 
     return Status::OK();
   }
