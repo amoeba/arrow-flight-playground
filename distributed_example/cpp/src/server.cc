@@ -14,6 +14,7 @@
 #include <parquet/arrow/reader.h>
 #include <parquet/arrow/writer.h>
 #include <arrow/flight/server_tracing_middleware.h>
+#include <arrow/flight/client_tracing_middleware.h>
 #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
 #include "opentelemetry/sdk/trace/tracer.h"
 #include "opentelemetry/trace/scope.h"
@@ -145,6 +146,8 @@ public:
                const flight::Ticket &request,
                std::unique_ptr<flight::FlightDataStream> *stream) override
   {
+    std::cout << "Server DoPut" << std::endl;
+
     PrintTraceContext(context);
 
     ARROW_ASSIGN_OR_RAISE(auto input, root_->OpenInputFile(request.ticket));
@@ -225,7 +228,11 @@ private:
     auto location_result = arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
     location = location_result.ValueOrDie();
 
-    auto result = arrow::flight::FlightClient::Connect(location);
+    // Add in ClientTracingMiddleware
+    auto options = arrow::flight::FlightClientOptions::Defaults();
+    options.middleware.emplace_back(arrow::flight::MakeTracingClientMiddlewareFactory());
+
+    auto result = arrow::flight::FlightClient::Connect(location, options);
     client = std::move(result.ValueOrDie());
 
     std::cout << "Client for DataServer connected to " << location.ToString() << std::endl;
@@ -288,7 +295,7 @@ Status serve(int32_t port)
 {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
   {
-    ConfigureTraceExport();
+    ConfigureTraceExport("server");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();

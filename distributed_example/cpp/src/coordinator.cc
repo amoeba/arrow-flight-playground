@@ -12,6 +12,7 @@
 #include <parquet/arrow/reader.h>
 #include <parquet/arrow/writer.h>
 #include <arrow/flight/server_tracing_middleware.h>
+#include <arrow/flight/client_tracing_middleware.h>
 #include "opentelemetry/sdk/trace/tracer_provider_factory.h"
 #include "opentelemetry/sdk/trace/tracer.h"
 #include "opentelemetry/trace/scope.h"
@@ -79,8 +80,11 @@ public:
       std::cout << info.first << ": " << info.second->descriptor().path[0] << std::endl;
 
       // TODO: move is wrong
-      flights.push_back(std::move(info.second));
+      flights.push_back(*info.second.get());
     }
+
+    *listings = std::unique_ptr<flight::FlightListing>(
+        new flight::SimpleFlightListing(std::move(flights)));
 
     return Status::OK();
   }
@@ -120,7 +124,11 @@ private:
         location_result = arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
     location = location_result.ValueOrDie();
 
-    auto result = arrow::flight::FlightClient::Connect(location);
+    // Add in ClientTracingMiddleware
+    auto options = arrow::flight::FlightClientOptions::Defaults();
+    options.middleware.emplace_back(arrow::flight::MakeTracingClientMiddlewareFactory());
+
+    auto result = arrow::flight::FlightClient::Connect(location, options);
     client = std::move(result.ValueOrDie());
 
     std::cout << "Client for CoordinatorServer connected to " << location.ToString() << std::endl;
@@ -168,7 +176,7 @@ Status serve(int32_t port)
 {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
   {
-    ConfigureTraceExport();
+    ConfigureTraceExport("coordinator");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();

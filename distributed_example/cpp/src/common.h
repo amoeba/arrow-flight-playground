@@ -52,14 +52,14 @@ inline std::string env(const char *key, const char *fallback)
     return std::string{value};
 }
 
-void ConfigureTraceExport()
+void ConfigureTraceExport(std::string name)
 {
     std::cout << "Configuring Trace Exporter" << std::endl;
 
     // Create this server as a resource
     // See also: https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/resource/semantic_conventions/README.md#service
     auto resource = opentelemetry::sdk::resource::Resource::Create({
-        {"service.name", "distributed_flight_test"},
+        {"service.name", name},
         {"service.namespace", "FlightTest"},
         {"service.instance.id", "server"},
         {"service.version", "1.0.0"},

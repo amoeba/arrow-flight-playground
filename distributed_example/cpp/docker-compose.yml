@@ -19,6 +19,8 @@ services:
       - COORDINATOR_SERVER_HOST=coordinator
       - COORDINATORSERVER_PORT=8888
       - FLIGHT_DATASET_DIR=/data
+    ports:
+      - "8889:8889"
     volumes:
       - ./flight_datasets:/data
   jaeger:
