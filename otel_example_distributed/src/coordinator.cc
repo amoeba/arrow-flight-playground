@@ -27,8 +27,6 @@
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
 
-// #include <grpcpp/ext/channelz_service_plugin.h>
-
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -36,8 +34,6 @@
 #include <iostream>
 
 #include "common.h"
-
-// TODO: Check this out: https://github.com/apache/arrow/pull/12702
 
 namespace flight = arrow::flight;
 namespace nostd = opentelemetry::nostd;
@@ -79,7 +75,6 @@ public:
     {
       std::cout << info.first << ": " << info.second->descriptor().path[0] << std::endl;
 
-      // TODO: move is wrong
       flights.push_back(*info.second.get());
     }
 
@@ -171,7 +166,6 @@ private:
   std::unique_ptr<arrow::flight::FlightClient> client;
 }; // end DistributedFlightCoordinatorServer
 
-// TODO: how to sample?
 Status serve(int32_t port)
 {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
@@ -191,9 +185,6 @@ Status serve(int32_t port)
   flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<flight::FlightServerBase>(
       new DistributedFlightCoordinatorServer(std::move(root)));
-
-  // Must call this before server->Init();
-  // grpc::channelz::experimental::InitChannelzService();
 
   // Enable tracing
   options.middleware.emplace_back("tracing",

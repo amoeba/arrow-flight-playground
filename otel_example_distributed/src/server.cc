@@ -1,6 +1,5 @@
 #include <thread>
 
-// This example was taken from the apache arrow cookbook
 #include <arrow/buffer.h>
 #include <arrow/filesystem/filesystem.h>
 #include <arrow/filesystem/localfs.h>
@@ -29,8 +28,6 @@
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
 
-// #include <grpcpp/ext/channelz_service_plugin.h>
-
 #include <algorithm>
 #include <memory>
 #include <numeric>
@@ -38,8 +35,6 @@
 #include <iostream>
 
 #include "common.h"
-
-// TODO: Check this out: https://github.com/apache/arrow/pull/12702
 
 namespace flight = arrow::flight;
 namespace nostd = opentelemetry::nostd;
@@ -288,7 +283,6 @@ private:
   std::unique_ptr<arrow::flight::FlightClient> client;
 }; // end DistributedFlightDataServer
 
-// TODO: how to sample?
 Status serve(int32_t port)
 {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
@@ -308,9 +302,6 @@ Status serve(int32_t port)
   flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<DistributedFlightDataServer>(
       new DistributedFlightDataServer(std::move(root)));
-
-  // Must call this before server->Init();
-  // grpc::channelz::experimental::InitChannelzService();
 
   // Enable tracing
   options.middleware.emplace_back("tracing",
