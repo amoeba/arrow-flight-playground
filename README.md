@@ -13,7 +13,8 @@ Various examples related to [Apache Arrow Flight](https://arrow.apache.org/docs/
 
 ## Building & Running
 
-I've set this up so each example has its own `CMakeLists.txt` and each of those builds assumes you have a version of Arrow C++ configured and build elsewhere on your system.
+Each example should have its own `CMakeLists.txt` and assumes you have a version of Arrow C++ configured and build elsewhere on your system.
+Some of the examples may container Dockerfiles which will also build the example for you as an alternative to building it yourself.
 
 ### Arrow C++
 
