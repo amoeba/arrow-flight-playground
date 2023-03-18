@@ -1,37 +1,36 @@
-// This example was taken from the apache arrow cookbook
+#include "opentelemetry/exporters/ostream/span_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/trace/simple_processor_factory.h"
+#include "opentelemetry/sdk/trace/tracer.h"
+#include "opentelemetry/sdk/trace/tracer_provider.h"
+#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+#include "opentelemetry/trace/provider.h"
+#include "opentelemetry/trace/scope.h"
 #include <arrow/buffer.h>
 #include <arrow/filesystem/filesystem.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/flight/client.h>
+#include <arrow/flight/client_tracing_middleware.h>
 #include <arrow/flight/server.h>
+#include <arrow/flight/server_tracing_middleware.h>
 #include <arrow/pretty_print.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/table.h>
 #include <arrow/type.h>
-#include <parquet/arrow/reader.h>
-#include <parquet/arrow/writer.h>
-#include <arrow/flight/server_tracing_middleware.h>
-#include <arrow/flight/client_tracing_middleware.h>
-#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
-#include "opentelemetry/sdk/trace/tracer.h"
-#include "opentelemetry/trace/scope.h"
-#include "opentelemetry/trace/provider.h"
-#include "opentelemetry/exporters/ostream/span_exporter_factory.h"
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
-#include "opentelemetry/sdk/trace/simple_processor_factory.h"
-#include "opentelemetry/sdk/common/global_log_handler.h"
-#include "opentelemetry/sdk/trace/tracer_provider.h"
 #include <opentelemetry/context/propagation/global_propagator.h>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
+#include <parquet/arrow/reader.h>
+#include <parquet/arrow/writer.h>
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <numeric>
 #include <vector>
-#include <iostream>
 
 #include "common.h"
 
@@ -47,14 +46,13 @@ namespace context = opentelemetry::context;
 using namespace std::chrono_literals;
 using Status = arrow::Status;
 
-class DistributedFlightCoordinatorServer : public flight::FlightServerBase
-{
+class DistributedFlightCoordinatorServer : public flight::FlightServerBase {
 public:
   const flight::ActionType kActionSayHello{"say_hello", "Say hello."};
 
-  explicit DistributedFlightCoordinatorServer(std::shared_ptr<arrow::fs::FileSystem> root)
-      : root_(std::move(root))
-  {
+  explicit DistributedFlightCoordinatorServer(
+      std::shared_ptr<arrow::fs::FileSystem> root)
+      : root_(std::move(root)) {
     // This gets the global tracer that has been set in ConfigureTraceExport.
     // tracer_ is used to create spans.
     auto provider = trace::Provider::GetTracerProvider();
@@ -63,17 +61,17 @@ public:
     this->ConnectInternalClient();
   }
 
-  Status ListFlights(
-      const flight::ServerCallContext &context, const flight::Criteria *,
-      std::unique_ptr<flight::FlightListing> *listings) override
-  {
+  Status
+  ListFlights(const flight::ServerCallContext &context,
+              const flight::Criteria *,
+              std::unique_ptr<flight::FlightListing> *listings) override {
     PrintTraceContext(context);
 
     std::vector<flight::FlightInfo> flights;
 
-    for (const auto &info : this->available_datasets)
-    {
-      std::cout << info.first << ": " << info.second->descriptor().path[0] << std::endl;
+    for (const auto &info : this->available_datasets) {
+      std::cout << info.first << ": " << info.second->descriptor().path[0]
+                << std::endl;
 
       flights.push_back(*info.second.get());
     }
@@ -85,22 +83,19 @@ public:
   }
 
   Status ListActions(const flight::ServerCallContext &,
-                     std::vector<flight::ActionType> *actions) override
-  {
+                     std::vector<flight::ActionType> *actions) override {
     *actions = {kActionSayHello};
     return Status::OK();
   }
 
   Status DoAction(const flight::ServerCallContext &,
                   const flight::Action &action,
-                  std::unique_ptr<flight::ResultStream> *result) override
-  {
+                  std::unique_ptr<flight::ResultStream> *result) override {
     auto span = tracer_->StartSpan("DoActionImpl");
     auto scope = tracer_->WithActiveSpan(span);
     span->SetAttribute("action.type", action.type);
 
-    if (action.type == kActionSayHello.type)
-    {
+    if (action.type == kActionSayHello.type) {
       *result = std::unique_ptr<flight::ResultStream>(
           new flight::SimpleResultStream({}));
       return DoActionSayHello(action.body->ToString());
@@ -109,28 +104,28 @@ public:
   }
 
 private:
-  void ConnectInternalClient()
-  {
+  void ConnectInternalClient() {
     auto host = env("DATA_SERVER_HOST", "localhost");
     auto port = env("DATA_SERVER_PORT", "5000");
 
     arrow::flight::Location location;
-    arrow::Result<arrow::flight::Location>
-        location_result = arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
+    arrow::Result<arrow::flight::Location> location_result =
+        arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
     location = location_result.ValueOrDie();
 
     // Add in ClientTracingMiddleware
     auto options = arrow::flight::FlightClientOptions::Defaults();
-    options.middleware.emplace_back(arrow::flight::MakeTracingClientMiddlewareFactory());
+    options.middleware.emplace_back(
+        arrow::flight::MakeTracingClientMiddlewareFactory());
 
     auto result = arrow::flight::FlightClient::Connect(location, options);
     client = std::move(result.ValueOrDie());
 
-    std::cout << "Client for CoordinatorServer connected to " << location.ToString() << std::endl;
+    std::cout << "Client for CoordinatorServer connected to "
+              << location.ToString() << std::endl;
   }
 
-  Status DoActionSayHello(const std::string &message)
-  {
+  Status DoActionSayHello(const std::string &message) {
     auto span = tracer_->StartSpan("DoActionSayHello");
     span->SetAttribute("message", message);
     auto scope = tracer_->WithActiveSpan(span);
@@ -141,11 +136,9 @@ private:
     auto listing_result = client->ListFlights();
     auto listing = std::move(listing_result.ValueOrDie());
 
-    while (true)
-    {
+    while (true) {
       auto flight_info_result = listing->Next();
-      if (flight_info_result == nullptr)
-      {
+      if (flight_info_result == nullptr) {
         std::cout << "No more results" << std::endl;
         break;
       }
@@ -162,21 +155,21 @@ private:
 
   std::shared_ptr<arrow::fs::FileSystem> root_;
   nostd::shared_ptr<opentelemetry::trace::Tracer> tracer_;
-  std::unordered_map<std::string, std::unique_ptr<arrow::flight::FlightInfo>> available_datasets;
+  std::unordered_map<std::string, std::unique_ptr<arrow::flight::FlightInfo>>
+      available_datasets;
   std::unique_ptr<arrow::flight::FlightClient> client;
 }; // end DistributedFlightCoordinatorServer
 
-Status serve(int32_t port)
-{
-  if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
-  {
+Status serve(int32_t port) {
+  if (env("OPENTELEMETRY_ENABLED", "") == "TRUE") {
     ConfigureTraceExport("coordinator");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   auto flight_data_dir = env("FLIGHT_DATASET_DIR", "./flight_datasets/");
   ARROW_RETURN_NOT_OK(fs->CreateDir(flight_data_dir));
-  auto root = std::make_shared<arrow::fs::SubTreeFileSystem>(flight_data_dir, fs);
+  auto root =
+      std::make_shared<arrow::fs::SubTreeFileSystem>(flight_data_dir, fs);
 
   flight::Location server_location;
   ARROW_ASSIGN_OR_RAISE(server_location,
@@ -196,13 +189,11 @@ Status serve(int32_t port)
   return Status::OK();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   int32_t port = argc > 1 ? std::atoi(argv[1]) : 5000;
 
   Status st = serve(port);
-  if (!st.ok())
-  {
+  if (!st.ok()) {
     return 1;
   }
   return 0;

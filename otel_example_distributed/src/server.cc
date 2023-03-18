@@ -1,38 +1,38 @@
 #include <thread>
 
+#include "opentelemetry/exporters/ostream/span_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
+#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
+#include "opentelemetry/sdk/common/global_log_handler.h"
+#include "opentelemetry/sdk/trace/simple_processor_factory.h"
+#include "opentelemetry/sdk/trace/tracer.h"
+#include "opentelemetry/sdk/trace/tracer_provider.h"
+#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
+#include "opentelemetry/trace/provider.h"
+#include "opentelemetry/trace/scope.h"
 #include <arrow/buffer.h>
 #include <arrow/filesystem/filesystem.h>
 #include <arrow/filesystem/localfs.h>
 #include <arrow/flight/client.h>
+#include <arrow/flight/client_tracing_middleware.h>
 #include <arrow/flight/server.h>
+#include <arrow/flight/server_tracing_middleware.h>
 #include <arrow/pretty_print.h>
 #include <arrow/result.h>
 #include <arrow/status.h>
 #include <arrow/table.h>
 #include <arrow/type.h>
-#include <parquet/arrow/reader.h>
-#include <parquet/arrow/writer.h>
-#include <arrow/flight/server_tracing_middleware.h>
-#include <arrow/flight/client_tracing_middleware.h>
-#include "opentelemetry/sdk/trace/tracer_provider_factory.h"
-#include "opentelemetry/sdk/trace/tracer.h"
-#include "opentelemetry/trace/scope.h"
-#include "opentelemetry/trace/provider.h"
-#include "opentelemetry/exporters/ostream/span_exporter_factory.h"
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_factory.h"
-#include "opentelemetry/exporters/otlp/otlp_grpc_exporter_options.h"
-#include "opentelemetry/sdk/trace/simple_processor_factory.h"
-#include "opentelemetry/sdk/common/global_log_handler.h"
-#include "opentelemetry/sdk/trace/tracer_provider.h"
 #include <opentelemetry/context/propagation/global_propagator.h>
 #include <opentelemetry/context/propagation/text_map_propagator.h>
 #include <opentelemetry/trace/propagation/http_trace_context.h>
+#include <parquet/arrow/reader.h>
+#include <parquet/arrow/writer.h>
 
 #include <algorithm>
+#include <iostream>
 #include <memory>
 #include <numeric>
 #include <vector>
-#include <iostream>
 
 #include "common.h"
 
@@ -48,14 +48,13 @@ namespace context = opentelemetry::context;
 using namespace std::chrono_literals;
 using Status = arrow::Status;
 
-class DistributedFlightDataServer : public flight::FlightServerBase
-{
+class DistributedFlightDataServer : public flight::FlightServerBase {
 public:
   const flight::ActionType kActionSayHello{"say_hello", "Say Hello."};
 
-  explicit DistributedFlightDataServer(std::shared_ptr<arrow::fs::FileSystem> root)
-      : root_(std::move(root))
-  {
+  explicit DistributedFlightDataServer(
+      std::shared_ptr<arrow::fs::FileSystem> root)
+      : root_(std::move(root)) {
     // This gets the global tracer that has been set in ConfigureTraceExport.
     // tracer_ is used to create spans.
     auto provider = trace::Provider::GetTracerProvider();
@@ -64,10 +63,10 @@ public:
     this->ConnectInternalClient();
   }
 
-  Status ListFlights(
-      const flight::ServerCallContext &context, const flight::Criteria *,
-      std::unique_ptr<flight::FlightListing> *listings) override
-  {
+  Status
+  ListFlights(const flight::ServerCallContext &context,
+              const flight::Criteria *,
+              std::unique_ptr<flight::FlightListing> *listings) override {
     PrintTraceContext(context);
 
     auto span = tracer_->StartSpan("ListFlightsImpl");
@@ -78,8 +77,7 @@ public:
     ARROW_ASSIGN_OR_RAISE(auto listing, root_->GetFileInfo(selector));
 
     std::vector<flight::FlightInfo> flights;
-    for (const auto &file_info : listing)
-    {
+    for (const auto &file_info : listing) {
       if (!file_info.IsFile() || file_info.extension() != "parquet")
         continue;
       ARROW_ASSIGN_OR_RAISE(auto info, MakeFlightInfo(file_info));
@@ -93,8 +91,7 @@ public:
 
   Status GetFlightInfo(const flight::ServerCallContext &context,
                        const flight::FlightDescriptor &descriptor,
-                       std::unique_ptr<flight::FlightInfo> *info) override
-  {
+                       std::unique_ptr<flight::FlightInfo> *info) override {
     PrintTraceContext(context);
 
     std::cout << descriptor.ToString() << std::endl;
@@ -109,11 +106,11 @@ public:
 
   Status DoPut(const flight::ServerCallContext &context,
                std::unique_ptr<flight::FlightMessageReader> reader,
-               std::unique_ptr<flight::FlightMetadataWriter>) override
-  {
+               std::unique_ptr<flight::FlightMetadataWriter>) override {
     PrintTraceContext(context);
 
-    ARROW_ASSIGN_OR_RAISE(auto file_info, FileInfoFromDescriptor(reader->descriptor()));
+    ARROW_ASSIGN_OR_RAISE(auto file_info,
+                          FileInfoFromDescriptor(reader->descriptor()));
     ARROW_ASSIGN_OR_RAISE(auto sink, root_->OpenOutputStream(file_info.path()));
 
     std::shared_ptr<arrow::Table> table;
@@ -128,8 +125,8 @@ public:
     {
       auto span_writing = tracer_->StartSpan("Writing table");
       auto scope = tracer_->WithActiveSpan(span_writing);
-      ARROW_RETURN_NOT_OK(parquet::arrow::WriteTable(*table, arrow::default_memory_pool(),
-                                                     sink, /*chunk_size=*/65536));
+      ARROW_RETURN_NOT_OK(parquet::arrow::WriteTable(
+          *table, arrow::default_memory_pool(), sink, /*chunk_size=*/65536));
       // TODO: Add metric of bytes written to sinks
       span_writing->SetAttribute("bytes_written", sink->Tell().ValueOr(-1));
     }
@@ -139,14 +136,13 @@ public:
 
   Status DoGet(const flight::ServerCallContext &context,
                const flight::Ticket &request,
-               std::unique_ptr<flight::FlightDataStream> *stream) override
-  {
+               std::unique_ptr<flight::FlightDataStream> *stream) override {
     PrintTraceContext(context);
 
     ARROW_ASSIGN_OR_RAISE(auto input, root_->OpenInputFile(request.ticket));
     std::unique_ptr<parquet::arrow::FileReader> reader;
-    ARROW_RETURN_NOT_OK(parquet::arrow::OpenFile(std::move(input),
-                                                 arrow::default_memory_pool(), &reader));
+    ARROW_RETURN_NOT_OK(parquet::arrow::OpenFile(
+        std::move(input), arrow::default_memory_pool(), &reader));
 
     std::shared_ptr<arrow::Table> table;
     ARROW_RETURN_NOT_OK(reader->ReadTable(&table));
@@ -158,8 +154,9 @@ public:
     arrow::TableBatchReader batch_reader(*table);
     ARROW_ASSIGN_OR_RAISE(batches, batch_reader.ToRecordBatches());
 
-    ARROW_ASSIGN_OR_RAISE(auto owning_reader, arrow::RecordBatchReader::Make(
-                                                  std::move(batches), table->schema()));
+    ARROW_ASSIGN_OR_RAISE(
+        auto owning_reader,
+        arrow::RecordBatchReader::Make(std::move(batches), table->schema()));
     *stream = std::unique_ptr<flight::FlightDataStream>(
         new flight::RecordBatchStream(owning_reader));
 
@@ -167,8 +164,7 @@ public:
   }
 
   Status ListActions(const flight::ServerCallContext &context,
-                     std::vector<flight::ActionType> *actions) override
-  {
+                     std::vector<flight::ActionType> *actions) override {
 
     PrintTraceContext(context);
 
@@ -178,16 +174,14 @@ public:
 
   Status DoAction(const flight::ServerCallContext &context,
                   const flight::Action &action,
-                  std::unique_ptr<flight::ResultStream> *result) override
-  {
+                  std::unique_ptr<flight::ResultStream> *result) override {
 
     PrintTraceContext(context);
 
     return Status::NotImplemented("Unknown action type: ", action.type);
   }
 
-  void SayHello()
-  {
+  void SayHello() {
     auto span = tracer_->StartSpan("SayHello");
     auto scope = tracer_->WithActiveSpan(span);
 
@@ -198,12 +192,10 @@ public:
     auto stream_result = client->DoAction(action);
     auto stream = std::move(stream_result.ValueOrDie());
 
-    while (true)
-    {
+    while (true) {
       auto piece = stream->Next();
 
-      if (piece == nullptr)
-      {
+      if (piece == nullptr) {
         break;
       }
 
@@ -212,37 +204,37 @@ public:
   }
 
 private:
-  void ConnectInternalClient()
-  {
+  void ConnectInternalClient() {
     auto host = env("COORDINATOR_SERVER_HOST", "localhost");
     auto port = env("COORDINATORSERVER_PORT", "localhost");
 
     arrow::flight::Location location;
-    auto location_result = arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
+    auto location_result =
+        arrow::flight::Location::ForGrpcTcp(host, std::stoi(port));
     location = location_result.ValueOrDie();
 
     // Add in ClientTracingMiddleware
     auto options = arrow::flight::FlightClientOptions::Defaults();
-    options.middleware.emplace_back(arrow::flight::MakeTracingClientMiddlewareFactory());
+    options.middleware.emplace_back(
+        arrow::flight::MakeTracingClientMiddlewareFactory());
 
     auto result = arrow::flight::FlightClient::Connect(location, options);
     client = std::move(result.ValueOrDie());
 
-    std::cout << "Client for DataServer connected to " << location.ToString() << std::endl;
+    std::cout << "Client for DataServer connected to " << location.ToString()
+              << std::endl;
   }
 
   arrow::Result<flight::FlightInfo>
-  MakeFlightInfo(
-      const arrow::fs::FileInfo &file_info)
-  {
+  MakeFlightInfo(const arrow::fs::FileInfo &file_info) {
     auto span = tracer_->StartSpan("MakeFlightInfo");
     auto scope = tracer_->WithActiveSpan(span);
     span->SetAttribute("file_path", file_info.base_name());
 
     ARROW_ASSIGN_OR_RAISE(auto input, root_->OpenInputFile(file_info));
     std::unique_ptr<parquet::arrow::FileReader> reader;
-    ARROW_RETURN_NOT_OK(parquet::arrow::OpenFile(std::move(input),
-                                                 arrow::default_memory_pool(), &reader));
+    ARROW_RETURN_NOT_OK(parquet::arrow::OpenFile(
+        std::move(input), arrow::default_memory_pool(), &reader));
 
     std::shared_ptr<arrow::Schema> schema;
     ARROW_RETURN_NOT_OK(reader->GetSchema(&schema));
@@ -259,19 +251,15 @@ private:
     int64_t total_records = reader->parquet_reader()->metadata()->num_rows();
     int64_t total_bytes = file_info.size();
 
-    return flight::FlightInfo::Make(*schema, descriptor, {endpoint}, total_records,
-                                    total_bytes);
+    return flight::FlightInfo::Make(*schema, descriptor, {endpoint},
+                                    total_records, total_bytes);
   }
 
-  arrow::Result<arrow::fs::FileInfo> FileInfoFromDescriptor(
-      const flight::FlightDescriptor &descriptor)
-  {
-    if (descriptor.type != flight::FlightDescriptor::PATH)
-    {
+  arrow::Result<arrow::fs::FileInfo>
+  FileInfoFromDescriptor(const flight::FlightDescriptor &descriptor) {
+    if (descriptor.type != flight::FlightDescriptor::PATH) {
       return Status::Invalid("Must provide PATH-type FlightDescriptor");
-    }
-    else if (descriptor.path.size() != 1)
-    {
+    } else if (descriptor.path.size() != 1) {
       return Status::Invalid(
           "Must provide PATH-type FlightDescriptor with one path component");
     }
@@ -283,17 +271,16 @@ private:
   std::unique_ptr<arrow::flight::FlightClient> client;
 }; // end DistributedFlightDataServer
 
-Status serve(int32_t port)
-{
-  if (env("OPENTELEMETRY_ENABLED", "") == "TRUE")
-  {
+Status serve(int32_t port) {
+  if (env("OPENTELEMETRY_ENABLED", "") == "TRUE") {
     ConfigureTraceExport("server");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
   auto flight_data_dir = env("FLIGHT_DATASET_DIR", "./flight_datasets/");
   ARROW_RETURN_NOT_OK(fs->CreateDir(flight_data_dir));
-  auto root = std::make_shared<arrow::fs::SubTreeFileSystem>(flight_data_dir, fs);
+  auto root =
+      std::make_shared<arrow::fs::SubTreeFileSystem>(flight_data_dir, fs);
 
   flight::Location server_location;
   ARROW_ASSIGN_OR_RAISE(server_location,
@@ -317,13 +304,11 @@ Status serve(int32_t port)
   return Status::OK();
 }
 
-int main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
   int32_t port = argc > 1 ? std::atoi(argv[1]) : 5000;
 
   Status st = serve(port);
-  if (!st.ok())
-  {
+  if (!st.ok()) {
     return 1;
   }
   return 0;
