@@ -1,6 +1,7 @@
-# otel_example_distributed
+# distributed_with_opentelemetry
 
-Example of Apache Arrow Flight instrumented with OpenTelemetry that splits the Flight Server into two components:
+Example of distributed Apache Arrow Flight instrumented with OpenTelemetry.
+Distributed in this case means the Flight Server is split into two components:
 
 1. **Coordinator:** Serves Flight RPC methods such as ListFlights, GetFlightInfo
 2. **Server:** Serves potentially long-running Flight RPC methods such as DoGet (eventually: DoPut)

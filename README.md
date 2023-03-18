@@ -8,7 +8,7 @@ Various examples related to [Apache Arrow Flight](https://arrow.apache.org/docs/
 - [headers_call_options](./headers_call_options/): Example of using FlightCallOptions to pass context between a Flight Server and Flight Client
 - [headers_middleware](./headers_middleware/): Example of using Flight Middleware to pass context between a Flight Server and Flight Client
 - [test_flight_stress](./test_flight_stress/): Example of various combinations of Arrow versions and Flight Clients to stress test Flight
-- [otel_example_distributed](./otel_example_distributed/): Example of a distributed (multi-server) Flight server with end-to-end OpenTelemetry tracing
+- [distributed_with_opentelemetry](./distributed_with_opentelemetry/): Example of a distributed (multi-server) Flight server with end-to-end OpenTelemetry tracing
 
 
 ## Building & Running
