@@ -59,22 +59,6 @@ RUN git clone --branch v${grpc_version} https://github.com/grpc/grpc && \
         . && \
     cmake --build . --target install --parallel 4
 
-# Build and install opentelemetry
-RUN git clone --branch v${otel_version} --recursive https://github.com/open-telemetry/opentelemetry-cpp && \
-    cd opentelemetry-cpp && \
-    cmake \
-        -DCMAKE_BUILD_TYPE=${build_type} \
-        -DBUILD_TESTING=OFF \
-        -DWITH_EXAMPLES_HTTP=ON \
-        -DWITH_OTLP=ON \
-        -DWITH_OTLP_HTTP=ON \
-        -DWITH_OTLP_GRPC=ON \
-        -DWITH_PROMETHEUS=ON \
-        -DCMAKE_CXX_STANDARD=17 \
-        -DCMAKE_CXX_FLAGS=-fPIC \
-        . && \
-    cmake --build . --target install --parallel 4
-
 # Build and install Arrow
 RUN git clone --branch apache-arrow-${arrow_version} --depth 1 https://github.com/apache/arrow && \
     mkdir arrow/cpp/build && \
@@ -88,13 +72,11 @@ RUN git clone --branch apache-arrow-${arrow_version} --depth 1 https://github.co
         -DARROW_PARQUET=ON \
         -DARROW_FLIGHT=ON \
         -DARROW_FILESYSTEM=ON \
-        -DARROW_WITH_OPENTELEMETRY=ON \
         -DARROW_DEPENDENCY_SOURCE=BUNDLED \
         -Dabsl_SOURCE=SYSTEM \
         -DRE2_SOURCE=SYSTEM \
         -DProtobuf_SOURCE=SYSTEM \
         -DgRPC_SOURCE=SYSTEM \
-        -Dopentelemetry-cpp_SOURCE=SYSTEM \
         .. && \
     cmake --build . --target install --parallel 4
 

@@ -82,6 +82,4 @@ target_link_libraries(server
     parquet
     arrow_flight
     arrow
-    opentelemetry-cpp::otlp_grpc_exporter
-    opentelemetry-cpp::ostream_span_exporter
 )
