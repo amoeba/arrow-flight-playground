@@ -1,3 +1,5 @@
+#!/bin/sh
+
 echo "testing epollex server..."
 sleep 5
 
