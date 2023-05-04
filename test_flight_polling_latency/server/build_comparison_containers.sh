@@ -1,3 +1,5 @@
+#!/bin/sh
+
 docker build \
     -t flight-server-arrow-8-grpc-1-35 \
     --build-arg arrow_version=8.0.0 \

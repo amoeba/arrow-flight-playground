@@ -8,7 +8,7 @@ First, build the server container:
 
 ```shell
 pushd server
-bash build_comparison_containers.sh
+sh build_comparison_containers.sh
 popd
 ```
 
