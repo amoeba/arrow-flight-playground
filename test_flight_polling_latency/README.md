@@ -42,3 +42,17 @@ python load_server.py 1000 60 --location 'grpc://localhost:5000'
 The first time you run this, you will need to setup grafana with a dashboard
 pointing at the Prometheus data source, and then create a dashboard viewing 
 the metrics defined in `load_server.py`.
+
+- Log into Grafana in a web browser at http://localhost:3000
+    - Enter password of admin/admin
+- Add Promethesus as a Data Source
+    - Data Sources -> Add New Data Source -> Select Prometheus
+    - Enter a URL of "http://prometheus:9090"
+    - Click Save and Test
+- Create a new Dashboard
+    - Create Vizualizations for the following metrics, as desired:
+        - request_time
+        - message_latency
+        - active_requests
+        - completed_requests
+    - When selecting metrics, ignore the ones that end in `_created`.
