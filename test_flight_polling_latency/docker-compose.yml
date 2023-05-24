@@ -3,7 +3,7 @@ services:
   flight-server-epollex:
     image: flight-server-arrow-8-grpc-1-35
     ports:
-      - "5000:5000"
+      - 5000:5000
     deploy:
       resources:
         limits:
@@ -15,7 +15,7 @@ services:
   flight-server-epoll1:
     image: flight-server-arrow-8-grpc-1-35
     ports:
-      - "5001:5000"
+      - 5001:5000
     deploy:
       resources:
         limits:
@@ -27,19 +27,18 @@ services:
   prometheus:
     image: prom/prometheus
     ports:
-      - "9090:9090"
-    user: "1000"
+      - 9090:9090
     volumes:
-      - ${PWD}/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ${PWD}/.prometheus:/prometheus
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./.prometheus:/prometheus
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
   grafana:
     hostname: grafana
     image: grafana/grafana
-    user: "1000"
     ports:
       - 3000:3000
     volumes:
-      - ${PWD}/.grafana:/var/lib/grafana
+      - ./.grafana:/var/lib/grafana
+      
