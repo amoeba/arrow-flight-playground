@@ -1,23 +1,23 @@
 version: "3.9"
 services:
-  coordinator:
+  metadata_server:
     build: .
-    command: ./coordinator 8888
+    command: ./metadata_server 8888
     environment:
       - OPENTELEMETRY_ENABLED=TRUE
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
-      - DATA_SERVER_HOST=server
+      - DATA_SERVER_HOST=data_server
       - DATA_SERVER_PORT=8889
     ports:
       - "8888:8888"
-  server:
+  data_server:
     build: ./
-    command: ./server 8889
+    command: ./data_server 8889
     environment:
       - OPENTELEMETRY_ENABLED=TRUE
       - OPENTELEMETRY_COLLECTOR_URI=http://jaeger:4317
-      - COORDINATOR_SERVER_HOST=coordinator
-      - COORDINATORSERVER_PORT=8888
+      - METADATA_SERVER_HOST=metadata_server
+      - METADATA_SERVER_PORT=8888
       - FLIGHT_DATASET_DIR=/data
     ports:
       - "8889:8889"

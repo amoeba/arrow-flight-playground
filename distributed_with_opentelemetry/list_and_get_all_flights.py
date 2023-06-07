@@ -53,7 +53,7 @@ class ClientTracingMiddleware(flight.ClientMiddleware):
 
 
 def main():
-    coordinator_client = pa.flight.connect(
+    metadata_client = pa.flight.connect(
         "grpc://0.0.0.0:8888",
         middleware=[ClientTracingMiddlewareFactory()],
     )
@@ -62,7 +62,7 @@ def main():
         "list_and_get_all_flights"
     ) as list_all_flights_span:
         n_flights = 0
-        for flight_info in coordinator_client.list_flights():
+        for flight_info in metadata_client.list_flights():
             n_flights += 1
             with tracer.start_as_current_span("get_single_flight"):
                 with tracer.start_as_current_span("connect_temp_client"):

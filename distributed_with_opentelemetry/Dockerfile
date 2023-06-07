@@ -107,12 +107,12 @@ RUN mkdir build && \
     -DCMAKE_CXX_STANDARD=17 \
     ../src && \
     cmake --build . --parallel 4 && \
-    mv ./coordinator ../coordinator && \
-    mv ./server ../server
+    mv ./metadata_server ../metadata_server && \
+    mv ./data_server ../data_server
 
 ENV LD_LIBRARY_PATH=/usr/local/lib
 
-CMD ./coordinator 5000
+CMD ./metadata_server 5000
 
 # Flight server
 EXPOSE 5000/tcp

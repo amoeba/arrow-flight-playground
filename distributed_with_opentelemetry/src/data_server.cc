@@ -205,8 +205,8 @@ public:
 
 private:
   void ConnectInternalClient() {
-    auto host = env("COORDINATOR_SERVER_HOST", "localhost");
-    auto port = env("COORDINATORSERVER_PORT", "localhost");
+    auto host = env("METADATA_SERVER_HOST", "localhost");
+    auto port = env("METADATA_SERVER_PORT", "8888");
 
     arrow::flight::Location location;
     auto location_result =
@@ -273,7 +273,7 @@ private:
 
 Status serve(int32_t port) {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE") {
-    ConfigureTraceExport("server");
+    ConfigureTraceExport("data_server");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();

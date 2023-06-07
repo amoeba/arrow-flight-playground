@@ -7,11 +7,11 @@ find_package(opentelemetry-cpp CONFIG REQUIRED)
 find_package(Arrow CONFIG REQUIRED)
 
 add_executable(
-    coordinator
-    coordinator.cc
+    metadata_server
+    metadata_server.cc
 )
 
-target_link_libraries(coordinator
+target_link_libraries(metadata_server
     parquet
     arrow_flight
     arrow
@@ -20,11 +20,11 @@ target_link_libraries(coordinator
 )
 
 add_executable(
-    server
-    server.cc
+    data_server
+    data_server.cc
 )
 
-target_link_libraries(server
+target_link_libraries(data_server
     parquet
     arrow_flight
     arrow

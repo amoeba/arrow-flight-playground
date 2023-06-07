@@ -46,11 +46,11 @@ namespace context = opentelemetry::context;
 using namespace std::chrono_literals;
 using Status = arrow::Status;
 
-class DistributedFlightCoordinatorServer : public flight::FlightServerBase {
+class DistributedFlightMetadataServer : public flight::FlightServerBase {
 public:
   const flight::ActionType kActionSayHello{"say_hello", "Say hello."};
 
-  explicit DistributedFlightCoordinatorServer(
+  explicit DistributedFlightMetadataServer(
       std::shared_ptr<arrow::fs::FileSystem> root)
       : root_(std::move(root)) {
     // This gets the global tracer that has been set in ConfigureTraceExport.
@@ -121,7 +121,7 @@ private:
     auto result = arrow::flight::FlightClient::Connect(location, options);
     client = std::move(result.ValueOrDie());
 
-    std::cout << "Client for CoordinatorServer connected to "
+    std::cout << "Client for MetadataServer connected to "
               << location.ToString() << std::endl;
   }
 
@@ -158,11 +158,11 @@ private:
   std::unordered_map<std::string, std::unique_ptr<arrow::flight::FlightInfo>>
       available_datasets;
   std::unique_ptr<arrow::flight::FlightClient> client;
-}; // end DistributedFlightCoordinatorServer
+}; // end DistributedFlightMetadataServer
 
 Status serve(int32_t port) {
   if (env("OPENTELEMETRY_ENABLED", "") == "TRUE") {
-    ConfigureTraceExport("coordinator");
+    ConfigureTraceExport("metadata_server");
   }
 
   auto fs = std::make_shared<arrow::fs::LocalFileSystem>();
@@ -177,7 +177,7 @@ Status serve(int32_t port) {
 
   flight::FlightServerOptions options(server_location);
   auto server = std::unique_ptr<flight::FlightServerBase>(
-      new DistributedFlightCoordinatorServer(std::move(root)));
+      new DistributedFlightMetadataServer(std::move(root)));
 
   // Enable tracing
   options.middleware.emplace_back("tracing",
