@@ -1,23 +1,26 @@
 # distributed_with_opentelemetry
 
-Example of distributed Apache Arrow Flight instrumented with OpenTelemetry.
-Distributed in this case means the Flight Server is split into two components:
+Example of distributed [Apache Arrow Flight](https://arrow.apache.org/docs/format/Flight.html) instrumented with [OpenTelemetry](https://opentelemetry.io/).
+Distributed in this case means the Flight Server is split into two types:
 
-1. **Coordinator:** Serves Flight RPC methods such as ListFlights, GetFlightInfo
-2. **Server:** Serves potentially long-running Flight RPC methods such as DoGet (eventually: DoPut)
+1. **Coordinator:** Handles ListFlights, GetFlightInfo
+2. **Server:** Handles DoGet, DoPut, etc
 
-The rationale for the split is to make it easier to scale to scenarios where there are hundreds (or thousands) of Flight clients you'd like to horizontally scale your Flight servers to support the increased concurrency.
-To make this example easier to understand and debug, OpenTelemetry has been integrated in such a way that context is propagated seamlessly between the client and servers.
+The main reason to split the server into two is so instances of the two types can be horizontally scaled independently to handle increased load.
+How this works is that any Flight Client would first talk to the Coordinator to get a list of Flights and then go directly to the Server instances to get data.
+
+Because this example uses OpenTelemetry and the underlying client and server implementations are manually instrumented, we can use a tool like JaegerUI to visualize the flow:
 
 ![Screenshot of JaegerUI showing a complicated OpenTelemetry trace between there services: client, coordinator, and server.](./docs/jaeger_screenshot.png)
 
 ## How This Works
 
-The Coordinator needs to know about the Flights the Server(s) can serve.
-There are certainly a few ways this could be implemented but the method used here is to have the Server advertise the Flights it can serve to the the Coordinator when it starts up.
-*Note: De-registration hasn't been implemented to handle the case where a Server goes down and can no longer fulfill DoGet calls but you would want to do this in a real scenario.
+The first challenge with a distributed server setup is to find a way for the Coordinator to know about Servers and to know what Flights those servers can serve.
+There are a lot of ways this could be implemented but for this example we do something simple: When a Server instance starts, it connects to the Coordinator and advertises itself with an Action, `SayHello`. The Coordinator then queries the Server for a list of the Flights it can serve and saves that information for later.
 
-The following sequence diagram shows the order or calls from startup to a client request for all Flights:
+When a Client wants to get data, it asks the Coordinator for a list of Flights. Each Flight in the response lists one or more instances of a Server as an Endpoint and then the client can them get the data from any of the Endpoints.
+
+Here's how this looks:
 
 ```mermaid
 sequenceDiagram
@@ -46,6 +49,8 @@ sequenceDiagram
 2. Install Python requirements with `python -m pip install -r requirements.txt`
 
 ### Running the Coordinator and Server
+
+Note: This can take a while.
 
 ```sh
 docker compose up
