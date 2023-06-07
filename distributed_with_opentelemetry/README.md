@@ -7,13 +7,13 @@ Distributed in this case means the Flight Server is split into two types:
 2. **Data Server:** Handles DoGet, DoPut, etc
 
 The main reason to split the server into two is so instances of the two types can be horizontally scaled independently to handle increased load.
-How this works is that any Flight Client would first talk to the Metadata Server to get a list of Flights and then go directly to the Data Server instances to get data.
+How this works is that any Flight Client would first talk to the Metadata Server to get a list of Flights and then it would go directly to the Data Server instances to get data.
 
 Because this example uses OpenTelemetry and the underlying client and server implementations are manually instrumented, we can use a tool like JaegerUI to visualize the flow:
 
 ![Screenshot of JaegerUI showing a complicated OpenTelemetry trace between there services: client, metadata server, and data server.](./docs/jaeger_screenshot.png)
 
-## How This Works
+## Implementation
 
 The first challenge with a distributed server setup is to find a way for the Metadata Server to know about Data Servers and to know what Flights those servers can serve.
 There are a lot of ways this could be implemented but for this example we do something simple: When a Data Server instance starts, it connects to the Metadata Server and advertises itself using an custom Action, `SayHello`. The Metadata Server then queries the Data Server for a list of the Flights it can serve and saves that information for later.
