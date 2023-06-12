@@ -1,0 +1,44 @@
+version: "3.9"
+services:
+  flight-server-epollex:
+    image: flight-server-arrow-8-grpc-1-35
+    ports:
+      - 5000:5000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+    environment:
+      - GRPC_POLL_STRATEGY=epollex
+  
+  flight-server-epoll1:
+    image: flight-server-arrow-8-grpc-1-35
+    ports:
+      - 5001:5000
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 400M
+    environment:
+      - GRPC_POLL_STRATEGY=epoll1
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./.prometheus:/prometheus
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  grafana:
+    hostname: grafana
+    image: grafana/grafana
+    ports:
+      - 3000:3000
+    volumes:
+      - ./.grafana:/var/lib/grafana
+      
